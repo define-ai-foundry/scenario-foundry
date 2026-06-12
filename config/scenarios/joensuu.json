@@ -1,0 +1,210 @@
+{
+  "scenario_meta": {
+    "name": "Joensuu Multi-Vector Saturation Attack Scenario",
+    "start_time_iso": "2026-11-15T02:45:00Z",
+    "duration_seconds": 4500,
+    "time_step_seconds": 20
+  },
+  "targets": {
+    "POWER_PLANT": {
+      "lat": 62.59481,
+      "lon": 29.832561,
+      "alt": 40.0
+    },
+    "RAILWAY_HUB": {
+      "lat": 62.600511,
+      "lon": 29.778501,
+      "alt": 30.0
+    },
+    "PEKKALA_BRIDGE": {
+      "lat": 62.608862,
+      "lon": 29.790993,
+      "alt": 25.0
+    },
+    "AIRPORT": {
+      "lat": 62.657369,
+      "lon": 29.61466,
+      "alt": 120.0
+    }
+  },
+  "threat_profiles": {
+    "W1_DECOY": {
+      "count": 12,
+      "speed_kmh": 200,
+      "alt_m": 1500.0,
+      "classification": "UAV_Decoy",
+      "launch_delay_sec": 0,
+      "id_suffix": "DECOY",
+      "wkt_linestring": "LINESTRING (30.6320 62.1850, 30.1200 62.4520, 29.778501 62.600511)"
+    },
+    "W2_KMS_PLANT": {
+      "count": 10,
+      "speed_kmh": 185,
+      "alt_m": 60.0,
+      "classification": "UAV_Propeller_Kamikaze",
+      "launch_delay_sec": 60,
+      "id_suffix": "PLANT",
+      "wkt_linestring": "LINESTRING (30.6900 62.1510, 30.2000 62.3000, 30.0100 62.5000, 29.832561 62.594810)"
+    },
+    "W2_KMS_RAILWAY": {
+      "count": 10,
+      "speed_kmh": 185,
+      "alt_m": 60.0,
+      "classification": "UAV_Propeller_Kamikaze",
+      "launch_delay_sec": 90,
+      "id_suffix": "RAILWAY",
+      "wkt_linestring": "LINESTRING (31.1200 62.4200, 30.5000 62.5500, 29.9000 62.6200, 29.778501 62.600511)"
+    },
+    "W2_KMS_BRIDGE": {
+      "count": 10,
+      "speed_kmh": 185,
+      "alt_m": 60.0,
+      "classification": "UAV_Propeller_Kamikaze",
+      "launch_delay_sec": 120,
+      "id_suffix": "BRIDGE",
+      "wkt_linestring": "LINESTRING (30.6320 62.1850, 29.9500 62.4500, 29.790993 62.608862)"
+    },
+    "W2_KMS_AIRPORT": {
+      "count": 10,
+      "speed_kmh": 185,
+      "alt_m": 60.0,
+      "classification": "UAV_Propeller_Kamikaze",
+      "launch_delay_sec": 150,
+      "id_suffix": "AIRPORT",
+      "wkt_linestring": "LINESTRING (31.3100 62.6710, 30.4000 62.7500, 29.8500 62.7200, 29.614660 62.657369)"
+    },
+    "W3_TACTICAL_FPV": {
+      "count": 6,
+      "speed_kmh": 100,
+      "alt_m": 15.0,
+      "classification": "UAV_Rotary_Micro_FPV",
+      "launch_delay_sec": 600,
+      "id_suffix": "FPV",
+      "wkt_linestring": "LINESTRING (29.8820 62.6510, 29.8360 62.5930, 29.832561 62.594810)"
+    }
+  },
+  "sensor_network": [
+    {
+      "id": "FI-MIL-RAD-KOLI-01",
+      "type": "RADAR_STRATEGIC",
+      "lat": 62.95,
+      "lon": 29.8,
+      "range_m": 150000,
+      "update_rate_sec": 18.0
+    },
+    {
+      "id": "FI-MIL-MRAD-HEINA-02",
+      "type": "RADAR_TACTICAL",
+      "lat": 62.5415,
+      "lon": 30.146,
+      "range_m": 25000,
+      "update_rate_sec": 11.0
+    },
+    {
+      "id": "FI-MIL-RAD-ONTTOLA-01",
+      "type": "RADAR_TACTICAL",
+      "lat": 62.66,
+      "lon": 29.62,
+      "range_m": 40000,
+      "update_rate_sec": 12.0
+    },
+    {
+      "id": "FI-CIV-ACU-SAVONVOIMA-01",
+      "type": "ACOUSTIC",
+      "lat": 62.593,
+      "lon": 29.836,
+      "range_m": 3000,
+      "update_rate_sec": 9.0
+    },
+    {
+      "id": "FI-CIV-EOIR-SAVONVOIMA-STACK",
+      "type": "THERMAL_CAM",
+      "lat": 62.59481,
+      "lon": 29.832561,
+      "range_m": 4000,
+      "update_rate_sec": 14.0
+    },
+    {
+      "id": "FI-MIL-MDOP-RAIL-01",
+      "type": "MICRO_DOPPLER",
+      "lat": 62.600511,
+      "lon": 29.778501,
+      "range_m": 3500,
+      "update_rate_sec": 9.0
+    },
+    {
+      "id": "FI-MIL-MDOP-AIRPORT-WEST",
+      "type": "MICRO_DOPPLER",
+      "lat": 62.662,
+      "lon": 29.611,
+      "range_m": 3500,
+      "update_rate_sec": 13.0
+    },
+    {
+      "id": "FI-BOR-EOIR-PEKKALABRIDGE-01",
+      "type": "THERMAL_CAM",
+      "lat": 62.6095,
+      "lon": 29.7895,
+      "range_m": 4000,
+      "update_rate_sec": 12.0
+    },
+    {
+      "id": "FI-CIV-CAM-SAVONVOIMA-GATE",
+      "type": "VISUAL_CAM",
+      "lat": 62.5941,
+      "lon": 29.8312,
+      "range_m": 3000,
+      "update_rate_sec": 14.0
+    }
+  ],
+  "terrain_elevation_anchors": [
+    {
+      "name": "Lake Pyhaselka Surface Base",
+      "lat": 62.55,
+      "lon": 29.7,
+      "elevation_msl": 76.0
+    },
+    {
+      "name": "Joensuu City Center Grid",
+      "lat": 62.6,
+      "lon": 29.76,
+      "elevation_msl": 82.0
+    },
+    {
+      "name": "Onttola Airfield Flat",
+      "lat": 62.66,
+      "lon": 29.62,
+      "elevation_msl": 114.0
+    },
+    {
+      "name": "Sirkkala Industrial Basin",
+      "lat": 62.59,
+      "lon": 29.83,
+      "elevation_msl": 88.0
+    },
+    {
+      "name": "Heinavaara High Ridge Node",
+      "lat": 62.5415,
+      "lon": 30.146,
+      "elevation_msl": 210.0
+    },
+    {
+      "name": "Koli Mountain Peak Anchor",
+      "lat": 62.95,
+      "lon": 29.8,
+      "elevation_msl": 347.0
+    },
+    {
+      "name": "Northern Wilderness Pass",
+      "lat": 62.75,
+      "lon": 30.4,
+      "elevation_msl": 165.0
+    },
+    {
+      "name": "Southern Inflow Border Point",
+      "lat": 62.15,
+      "lon": 30.69,
+      "elevation_msl": 90.0
+    }
+  ]
+}
