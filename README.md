@@ -18,58 +18,34 @@ SDG enables repeatable simulation, scalable experimentation, and accelerated dev
 
 ## 🛠️ System Architecture & Framework Layers
 
-The SDG engine splits data generation into a clear, three-tiered operational pipeline:
-```text
-  +--------------------------------------------------------+
-  |               Scenario Definition Layer                |
-  |  - Geographic Coordinates   - Operational Timelines    |
-  |  - Critical Infrastructure  - Sensor Deployments       |
-  +---------------------------+----------------------------+
-                              |
-                              v
-  +--------------------------------------------------------+
-  |                Simulation Engine Layer                 |
-  |  - Behavioral Profiles      - Terrain Refinement       |
-  |  - Kinematic Propagation    - Ground Truth Engine      |
-  +---------------------------+----------------------------+
-                              |
-                              v
-  +--------------------------------------------------------+
-  |                 Sensor Emulation Layer                 |
-  |  - Measurement Noise        - Horizon Constraints      |
-  |  - Asynchronous Schedules  - SAPIENT Message Export    |
-  +--------------------------------------------------------+
-```
-
-Native Repository Diagram (Mermaid)
-
-On GitHub, GitLab, and other modern Git platforms, this diagram renders natively as a crisp, interactive vector graphic:
+The SDG engine processes data generation through a structured, three-tiered operational pipeline. This design cleanly separates environment configuration from physical simulation and sensor perception.
 
 ```mermaid
 graph TD
-    subgraph Scenario Definition Layer
+    subgraph Scenario Definition Layer [1. Scenario Definition Layer]
         A[Geographic Coordinates & Timelines] --> D
         B[Critical Infrastructure & Assets] --> D
         C[Sensor Deployments & Coverage] --> D
     end
 
-    subgraph Simulation Engine Layer
+    subgraph Simulation Engine Layer [2. Simulation Engine Layer]
         D[Behavioral Profiles & Kinematics] --> E[OpenTopography DEM Ingest]
         E --> F[Terrain-Aware Path Refinement]
         F --> G[Absolute Ground Truth Engine]
     end
 
-    subgraph Sensor Emulation Layer
+    subgraph Sensor Emulation Layer [3. Sensor Emulation Layer]
         G --> H[Horizon & Visibility Constraints]
         H --> I[Perturbation & Error Injection]
         I --> J[Chronological SAPIENT Message Stream]
     end
 
+    %% Enhanced Styling for key nodes
     style G fill:#2d3748,stroke:#4a5568,stroke-width:2px,color:#fff
     style J fill:#1a365d,stroke:#2b6cb0,stroke-width:2px,color:#fff
 ```
 
-Scenario Definition Layer: Reads a single configuration file (.json) that acts as the authoritative description of the environment. This includes geographic setups, infrastructure assets, environmental conditions, and sensor layouts.
+Scenario Definition Layer: Reads a single configuration file (.json) that acts as the authoritative description of the environment. This includes geographic target locations, attack vectors, and sensor network layouts.
 
 Simulation Engine Layer: Digitally spawns and moves entities over time. It maintains the exact kinematic state (true location, speed, altitude) for all entities, establishing the scenario's absolute "Ground Truth".
 
