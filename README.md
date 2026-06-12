@@ -16,66 +16,18 @@ The generated data can be used to develop, test, and validate:
 
 SDG enables repeatable simulation, scalable experimentation, and accelerated development of SAPIENT-based surveillance and autonomy solutions.
 
-## 🛠️ System Architecture & Framework Layers
+## Key Features
 
-The SDG engine processes data generation through a structured, three-tiered operational pipeline. This design cleanly separates environment configuration from physical simulation and sensor perception.
-
-```mermaid
-graph TD
-    subgraph Scenario Definition Layer [1. Scenario Definition Layer]
-        A[Geographic Coordinates & Timelines] --> D
-        B[Critical Infrastructure & Assets] --> D
-        C[Sensor Deployments & Coverage] --> D
-    end
-
-    subgraph Simulation Engine Layer [2. Simulation Engine Layer]
-        D[Behavioral Profiles & Kinematics] --> E[OpenTopography DEM Ingest]
-        E --> F[Terrain-Aware Path Refinement]
-        F --> G[Absolute Ground Truth Engine]
-    end
-
-    subgraph Sensor Emulation Layer [3. Sensor Emulation Layer]
-        G --> H[Horizon & Visibility Constraints]
-        H --> I[Perturbation & Error Injection]
-        I --> J[Chronological SAPIENT Message Stream]
-    end
-
-    %% Enhanced Styling for key nodes
-    style G fill:#2d3748,stroke:#4a5568,stroke-width:2px,color:#fff
-    style J fill:#1a365d,stroke:#2b6cb0,stroke-width:2px,color:#fff
-```
-
-Scenario Definition Layer: Reads a single configuration file (.json) that acts as the authoritative description of the environment. This includes geographic target locations, attack vectors, and sensor network layouts.
-
-Simulation Engine Layer: Digitally spawns and moves entities over time. It maintains the exact kinematic state (true location, speed, altitude) for all entities, establishing the scenario's absolute "Ground Truth".
-
-Sensor Emulation Layer: Evaluates how individual surveillance assets perceive the ground truth. It filters reality through local constraints, degradation rules, and noise profiles to output an imperfect, realistic data stream.
-
-## ⛰️ Terrain-Aware Path Refinement
-
-The platform supports high-fidelity path adjustment using elevation data from OpenTopography terrain datasets. Instead of relying on rigid, geometric routes or flat-earth assumptions, the simulation builds geographic terrain environments using real-world coordinates.
-```text
-  Manually Planned Approach (joensuu.json) 
-                     |
-                     v
-    [ OpenTopography DEM Ingest Engine ]
-                     |
-                     v
-      Terrain-Aware Path Refinement ---> Elevation Anchors Interpolation
-                     |
-                     v
-   Enhanced Tactical Profiles (joensuu_tactical.json)
-```
-
-### Core Capabilities
-
-Elevation-Aware Route Refinement: Automatically adapts simple straight-line vector waypoints into terrain-conforming trajectories.
-
-Above-Ground-Level (AGL) Altitude Estimation: Computes and locks threat movements to precise heights relative to the local surface topography, preventing subterranean clipping.
-
-Realistic Terminal Trajectories: Simulates terrain-hugging approach vectors and terminal engagement dives against infrastructure assets.
-
-Sensor Line-of-Sight (LoS) Validation: Provides surface profiles to the Sensor Emulation Layer to calculate physical visibility limits, terrain masking, and horizon blocking.
+* **Single-Source Configuration**
+Define entire complex scenarios—including geography, assets, and sensor layouts—within a single, human-readable `.json` file.
+* **Terrain-Aware Simulation**
+Ingests real-world Digital Elevation Models (DEM) via OpenTopography to ensure entity paths and line-of-sight calculations adapt realistically to local geography.
+* **High-Fidelity Kinematics**
+Propagates entity movement using physics-backed behavioral profiles, establishing a mathematically precise absolute "Ground Truth."
+* **Realistic Sensor Degradation**
+Emulates true-to-life surveillance limitations by actively injecting measurement noise, tracking errors, and horizon/visibility constraints.
+* **Native SAPIENT Compliance**
+Outputs an asynchronous, real-time data stream fully formatted to the SAPIENT message protocol for seamless integration with downstream command and control systems.
 
 ## 🚀 Getting Started
 
