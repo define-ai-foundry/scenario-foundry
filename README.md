@@ -1,10 +1,10 @@
-SAPIENT Synthetic Data Generator (SDG)
+# SAPIENT Synthetic Data Generator (SDG)
 
 The SAPIENT Synthetic Data Generator (SDG) is a data-driven, highly configurable simulation framework designed to generate realistic, multi-sensor surveillance and tracking data for arbitrary operational scenarios. By combining user-defined environmental inputs with advanced sensor error modeling, the platform generates synthetic, SAPIENT-compliant sensor streams that emulate how real-world surveillance networks observe, track, classify, and report physical activity.
 
 High-quality multi-sensor datasets are often scarce, expensive to collect, operationally sensitive, or completely unavailable. The SDG addresses this critical bottleneck by decoupling data generation from specific geographic regions, threat models, or hardware deployments. It serves as an on-demand engine to rapidly build, test, and validate command-and-control (C2) systems, sensor fusion platforms, autonomy software, and machine learning models without dependence on live-field exercises or proprietary data networks.
 
-🛠️ System Architecture & Framework Layers
+## 🛠️ System Architecture & Framework Layers
 
 The SDG engine splits data generation into a clear, three-tiered operational pipeline:
 ```text
@@ -25,7 +25,7 @@ The SDG engine splits data generation into a clear, three-tiered operational pip
   +--------------------------------------------------------+
   |                 Sensor Emulation Layer                 |
   |  - Measurement Noise        - Horizon Constraints      |
-  |  - Asynchronous Schedules  - SAPIENT Message Export   |
+  |  - Asynchronous Schedules  - SAPIENT Message Export    |
   +--------------------------------------------------------+
 ```
 
@@ -63,7 +63,7 @@ Simulation Engine Layer: Digitally spawns and moves entities over time. It maint
 
 Sensor Emulation Layer: Evaluates how individual surveillance assets perceive the ground truth. It filters reality through local constraints, degradation rules, and noise profiles to output an imperfect, realistic data stream.
 
-⛰️ Terrain-Aware Path Refinement
+## ⛰️ Terrain-Aware Path Refinement
 
 The platform supports high-fidelity path adjustment using elevation data from OpenTopography terrain datasets. Instead of relying on rigid, geometric routes or flat-earth assumptions, the simulation builds geographic terrain environments using real-world coordinates.
 ```text
@@ -79,7 +79,7 @@ The platform supports high-fidelity path adjustment using elevation data from Op
    Enhanced Tactical Profiles (joensuu_tactical.json)
 ```
 
-Core Capabilities
+### Core Capabilities
 
 Elevation-Aware Route Refinement: Automatically adapts simple straight-line vector waypoints into terrain-conforming trajectories.
 
@@ -89,23 +89,23 @@ Realistic Terminal Trajectories: Simulates terrain-hugging approach vectors and 
 
 Sensor Line-of-Sight (LoS) Validation: Provides surface profiles to the Sensor Emulation Layer to calculate physical visibility limits, terrain masking, and horizon blocking.
 
-🚀 Getting Started
+## 🚀 Getting Started
 
 Follow these instructions to configure, run, and export your sensor simulation scenario.
 
-📋 Prerequisites
+### 📋 Prerequisites
 
 Ensure your host machine has Python 3.8+ installed. Clone this repository and install the required dependencies:
 
-# Clone the repository
+### Clone the repository
 git clone [https://github.com/DEFINE-AI-Foundry/scenario-generator.git](https://github.com/DEFINE-AI-Foundry/scenario-generator.git)
 cd scenario-generator
 
-# Install Python requirements
+### Install Python requirements
 pip install -r requirements.txt
 
 
-📦 Repository Directory Structure
+### 📦 Repository Directory Structure
 
 The workspace is organized into modular directories following standard  development patterns:
 ```text
@@ -130,18 +130,18 @@ scenario-generator/
 └── requirements.txt          # Project requirements manifest
 ```
 
-🏃 Execution Pipeline (Step-by-Step)
+## 🏃 Execution Pipeline (Step-by-Step)
 
 The synthetic data generation workflow consists of three simple steps:
 ```text
   [ Scenario Config ] ---> ( Run Simulation ) ---> [ SAPIENT Messages ] ---> ( Export Layers ) ---> [ GIS Maps ]
 ```
 
-Step 1: Scenario Configuration Setup
+### Step 1: Scenario Configuration Setup
 
 Create or modify a manually planned attack scenario (e.g., data/config/joensuu.json). Define targets, baseline drone attack flight lines, sensor positions, and terrain anchor elevations inside this file. (See the Scenario Configuration Guide below for detailed parameters).
 
-Step 2: Execute the Generation Engine
+### Step 2: Execute the Generation Engine
 
 Run the main generator to parse your scenario config, refine flight vectors using terrain elevations, emulate target detections, and generate SAPIENT-compliant real-time outputs:
 ```bash
@@ -155,7 +155,7 @@ joensuu_tactical.json: An enhanced configuration mapping terrain-refined WKT fli
 
 joensuu_messages.json: A chronological database of simulated sensor detection reports formatted in compliance with SAPIENT message standards.
 
-Step 3: Run the GIS Layer Exporter
+### Step 3: Run the GIS Layer Exporter
 
 Transform tactical data and sensor message outputs into map-ready CSV files:
 ```bash
@@ -170,7 +170,7 @@ OR
 python -m src.export_scenario --location joensuu
 ```
 
-🗺️ Geospatial Layer Visualization
+## 🗺️ Geospatial Layer Visualization
 
 Once exported, you can instantly visualize your tactical layers on Google My Maps or standard GIS tools (QGIS, ArcGIS):
 
