@@ -7,7 +7,7 @@ High-quality multi-sensor datasets are often scarce, expensive to collect, opera
 🛠️ System Architecture & Framework Layers
 
 The SDG engine splits data generation into a clear, three-tiered operational pipeline:
-**` ```text `**
+```text
   +--------------------------------------------------------+
   |               Scenario Definition Layer                |
   |  - Geographic Coordinates   - Operational Timelines    |
@@ -27,13 +27,13 @@ The SDG engine splits data generation into a clear, three-tiered operational pip
   |  - Measurement Noise        - Horizon Constraints      |
   |  - Asynchronous Schedules  - SAPIENT Message Export   |
   +--------------------------------------------------------+
-**` ``` `**
+```
 
 Native Repository Diagram (Mermaid)
 
 On GitHub, GitLab, and other modern Git platforms, this diagram renders natively as a crisp, interactive vector graphic:
 
-**` ```mermaid `**
+```mermaid
 graph TD
     subgraph Scenario Definition Layer
         A[Geographic Coordinates & Timelines] --> D
@@ -55,7 +55,7 @@ graph TD
 
     style G fill:#2d3748,stroke:#4a5568,stroke-width:2px,color:#fff
     style J fill:#1a365d,stroke:#2b6cb0,stroke-width:2px,color:#fff
-**` ``` `**
+```
 
 Scenario Definition Layer: Reads a single configuration file (.json) that acts as the authoritative description of the environment. This includes geographic setups, infrastructure assets, environmental conditions, and sensor layouts.
 
@@ -66,7 +66,7 @@ Sensor Emulation Layer: Evaluates how individual surveillance assets perceive th
 ⛰️ Terrain-Aware Path Refinement
 
 The platform supports high-fidelity path adjustment using elevation data from OpenTopography terrain datasets. Instead of relying on rigid, geometric routes or flat-earth assumptions, the simulation builds geographic terrain environments using real-world coordinates.
-**` ```text `**
+```text
   Manually Planned Approach (joensuu.json) 
                      |
                      v
@@ -77,7 +77,7 @@ The platform supports high-fidelity path adjustment using elevation data from Op
                      |
                      v
    Enhanced Tactical Profiles (joensuu_tactical.json)
-**` ``` `**
+```
 
 Core Capabilities
 
@@ -108,7 +108,7 @@ pip install -r requirements.txt
 📦 Repository Directory Structure
 
 The workspace is organized into modular directories following standard  development patterns:
-**````text `**
+```text
 scenario-generator/
 ├── config/
 │   ├── scenarios/            # Scenario configuration templates (.json)
@@ -128,14 +128,14 @@ scenario-generator/
 ├── LICENSE                   # Licensing legal terms
 ├── README.md                 # System documentation
 └── requirements.txt          # Project requirements manifest
-**` ``` `**
+```
 
 🏃 Execution Pipeline (Step-by-Step)
 
 The synthetic data generation workflow consists of three simple steps:
-**` ```text `**
+```text
   [ Scenario Config ] ---> ( Run Simulation ) ---> [ SAPIENT Messages ] ---> ( Export Layers ) ---> [ GIS Maps ]
-**` ``` `**
+```
 
 Step 1: Scenario Configuration Setup
 
@@ -144,10 +144,10 @@ Create or modify a manually planned attack scenario (e.g., data/config/joensuu.j
 Step 2: Execute the Generation Engine
 
 Run the main generator to parse your scenario config, refine flight vectors using terrain elevations, emulate target detections, and generate SAPIENT-compliant real-time outputs:
-**` ```bash `**
+```bash
 # Runs the simulation using input config, fetches terrain, and dumps tactical and message streams
 python -m src.generate_scenario --scenario joensuu
-**` ``` `**
+```
 
 Outputs Generated:
 
@@ -158,7 +158,7 @@ joensuu_messages.json: A chronological database of simulated sensor detection re
 Step 3: Run the GIS Layer Exporter
 
 Transform tactical data and sensor message outputs into map-ready CSV files:
-**` ```bash `**
+```bash
 python ./src/export_scenario.py \
   --scenario data/tactical_scenarios/joensuu_tactical.json \
   --messages data/generated_output/joensuu_messages.json \
@@ -168,7 +168,7 @@ python ./src/export_scenario.py \
 OR
 
 python -m src.export_scenario --location joensuu
-**` ``` `**
+```
 
 🗺️ Geospatial Layer Visualization
 
