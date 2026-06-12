@@ -68,6 +68,8 @@ data/tactical_scenarios/*
 # Exported CSV outputs
 data/export_output/*
 
+!data/**/.gitkeep
+
 # ============================================================
 # Keep the sample scenario
 # ============================================================
