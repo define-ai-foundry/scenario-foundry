@@ -57,24 +57,16 @@ config/local/
 # ============================================================
 
 # Terrain downloaded from external sources
-data/terrain/
+data/terrain/*
 
 # Generated scenarios
-data/generated_output/
+data/generated_output/*
 
 # Enhanced/generated tactical scenarios
-data/tactical_scenarios/
+data/tactical_scenarios/*
 
 # Exported CSV outputs
-data/export_output/
-
-
-# ============================================================
-# Keep repo placeholders
-# ============================================================
-
-!data/**/.gitkeep
-
+data/export_output/*
 
 # ============================================================
 # Keep the sample scenario
