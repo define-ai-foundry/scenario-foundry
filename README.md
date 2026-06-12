@@ -29,23 +29,34 @@ Emulates true-to-life surveillance limitations by actively injecting measurement
 * **Native SAPIENT Compliance**
 Outputs an asynchronous, real-time data stream fully formatted to the SAPIENT message protocol for seamless integration with downstream command and control systems.
 
-## 🚀 Getting Started
+## Getting Started
 
 Follow these instructions to configure, run, and export your sensor simulation scenario.
 
-### 📋 Prerequisites
+### Prerequisites
 
 Ensure your host machine has Python 3.8+ installed. Clone this repository and install the required dependencies:
 
 ### Clone the repository
+```bash
 git clone [https://github.com/DEFINE-AI-Foundry/scenario-generator.git](https://github.com/DEFINE-AI-Foundry/scenario-generator.git)
 cd scenario-generator
+```
 
 ### Install Python requirements
+```bash
 pip install -r requirements.txt
+```
 
+### Do a test run
+```bash
+python -m src.generate_scenario --scenario joensuu
+```
+This accumulates:
+- tactical_vectors
+- output_messages
 
-### 📦 Repository Directory Structure
+### Repository Directory Structure
 
 The workspace is organized into modular directories following standard  development patterns:
 ```text
@@ -70,7 +81,7 @@ scenario-generator/
 └── requirements.txt          # Project requirements manifest
 ```
 
-## 🏃 Execution Pipeline (Step-by-Step)
+## Execution Pipeline (Step-by-Step)
 
 The synthetic data generation workflow consists of three simple steps:
 ```text
