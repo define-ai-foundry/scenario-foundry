@@ -79,7 +79,7 @@ The synthetic data generation workflow consists of three simple steps:
 
 ### Step 1: Scenario Configuration Setup
 
-Create or modify a manually planned attack scenario (e.g., data/config/joensuu.json). Define targets, baseline drone attack flight lines, sensor positions, and terrain anchor elevations inside this file. (See the Scenario Configuration Guide below for detailed parameters).
+Create or modify a manually planned attack scenario (e.g., `data/config/joensuu.json`). Define targets, baseline drone attack flight lines, sensor positions, and terrain anchor elevations inside this file.
 
 ### Step 2: Execute the Generation Engine
 
@@ -91,9 +91,9 @@ python -m src.generate_scenario --scenario joensuu
 
 Outputs Generated:
 
-joensuu_tactical.json: An enhanced configuration mapping terrain-refined WKT flight paths alongside target assets and defensive sensor locations.
+`joensuu_tactical.json`: An enhanced configuration mapping terrain-refined WKT flight paths alongside target assets and defensive sensor locations.
 
-joensuu_messages.json: A chronological database of simulated sensor detection reports formatted in compliance with SAPIENT message standards.
+`joensuu_messages.json`: A chronological database of simulated sensor detection reports formatted in compliance with SAPIENT message standards.
 
 ### Step 3: Run the GIS Layer Exporter
 
@@ -112,11 +112,11 @@ python -m src.export_scenario --location joensuu
 
 ## 🗺️ Geospatial Layer Visualization
 
-Once exported, you can instantly visualize your tactical layers on Google My Maps or standard GIS tools (QGIS, ArcGIS):
+- Once exported, you can instantly visualize your tactical layers on Google My Maps or standard GIS tools (QGIS, ArcGIS):
 
-Open Google My Maps and create a new custom map.
+- Open Google My Maps and create a new custom map.
 
-For each generated CSV layer inside data/output/gis_layers/, click Add Layer and select Import:
+- For each generated CSV layer inside data/output/gis_layers/, click Add Layer and select Import:
 
 | Layer Source CSV | Spatial Column Selection | Label / Title Column | Visual Styling Tips |
 | :--- | :--- | :--- | :--- |
