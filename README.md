@@ -7,7 +7,7 @@ High-quality multi-sensor datasets are often scarce, expensive to collect, opera
 🛠️ System Architecture & Framework Layers
 
 The SDG engine splits data generation into a clear, three-tiered operational pipeline:
-
+**` ```text `**
   +--------------------------------------------------------+
   |               Scenario Definition Layer                |
   |  - Geographic Coordinates   - Operational Timelines    |
@@ -27,12 +27,13 @@ The SDG engine splits data generation into a clear, three-tiered operational pip
   |  - Measurement Noise        - Horizon Constraints      |
   |  - Asynchronous Schedules  - SAPIENT Message Export   |
   +--------------------------------------------------------+
-
+**` ``` `**
 
 Native Repository Diagram (Mermaid)
 
 On GitHub, GitLab, and other modern Git platforms, this diagram renders natively as a crisp, interactive vector graphic:
 
+**` ```mermaid `**
 graph TD
     subgraph Scenario Definition Layer
         A[Geographic Coordinates & Timelines] --> D
@@ -54,7 +55,7 @@ graph TD
 
     style G fill:#2d3748,stroke:#4a5568,stroke-width:2px,color:#fff
     style J fill:#1a365d,stroke:#2b6cb0,stroke-width:2px,color:#fff
-
+**` ``` `**
 
 Scenario Definition Layer: Reads a single configuration file (.json) that acts as the authoritative description of the environment. This includes geographic setups, infrastructure assets, environmental conditions, and sensor layouts.
 
@@ -65,7 +66,7 @@ Sensor Emulation Layer: Evaluates how individual surveillance assets perceive th
 ⛰️ Terrain-Aware Path Refinement
 
 The platform supports high-fidelity path adjustment using elevation data from OpenTopography terrain datasets. Instead of relying on rigid, geometric routes or flat-earth assumptions, the simulation builds geographic terrain environments using real-world coordinates.
-
+**` ```text `**
   Manually Planned Approach (joensuu.json) 
                      |
                      v
@@ -76,7 +77,7 @@ The platform supports high-fidelity path adjustment using elevation data from Op
                      |
                      v
    Enhanced Tactical Profiles (joensuu_tactical.json)
-
+**` ``` `**
 
 Core Capabilities
 
@@ -107,7 +108,7 @@ pip install -r requirements.txt
 📦 Repository Directory Structure
 
 The workspace is organized into modular directories following standard  development patterns:
-
+**````text `**
 scenario-generator/
 ├── config/
 │   ├── scenarios/            # Scenario configuration templates (.json)
@@ -127,14 +128,14 @@ scenario-generator/
 ├── LICENSE                   # Licensing legal terms
 ├── README.md                 # System documentation
 └── requirements.txt          # Project requirements manifest
-
+**` ``` `**
 
 🏃 Execution Pipeline (Step-by-Step)
 
 The synthetic data generation workflow consists of three simple steps:
-
+**` ```text `**
   [ Scenario Config ] ---> ( Run Simulation ) ---> [ SAPIENT Messages ] ---> ( Export Layers ) ---> [ GIS Maps ]
-
+**` ``` `**
 
 Step 1: Scenario Configuration Setup
 
@@ -143,10 +144,10 @@ Create or modify a manually planned attack scenario (e.g., data/config/joensuu.j
 Step 2: Execute the Generation Engine
 
 Run the main generator to parse your scenario config, refine flight vectors using terrain elevations, emulate target detections, and generate SAPIENT-compliant real-time outputs:
-
+**` ```bash `**
 # Runs the simulation using input config, fetches terrain, and dumps tactical and message streams
 python -m src.generate_scenario --scenario joensuu
-
+**` ``` `**
 
 Outputs Generated:
 
@@ -157,7 +158,7 @@ joensuu_messages.json: A chronological database of simulated sensor detection re
 Step 3: Run the GIS Layer Exporter
 
 Transform tactical data and sensor message outputs into map-ready CSV files:
-
+**` ```bash `**
 python ./src/export_scenario.py \
   --scenario data/tactical_scenarios/joensuu_tactical.json \
   --messages data/generated_output/joensuu_messages.json \
@@ -167,7 +168,7 @@ python ./src/export_scenario.py \
 OR
 
 python -m src.export_scenario --location joensuu
-
+**` ``` `**
 
 🗺️ Geospatial Layer Visualization
 
@@ -177,42 +178,9 @@ Open Google My Maps and create a new custom map.
 
 For each generated CSV layer inside data/output/gis_layers/, click Add Layer and select Import:
 
-Layer Source CSV
-
-Spatial Column Selection
-
-Label / Title Column
-
-Visual Styling Tips
-
-targets_layer.csv
-
-Latitude, Longitude
-
-Target_Name
-
-Red Flags (🏢) for critical structures.
-
-flight_vectors_layer.csv
-
-WKT (Well-Known Text)
-
-Vector_ID
-
-Group styles by classification (solid lines).
-
-sensor_network_layer.csv
-
-Latitude, Longitude
-
-Sensor_Node_ID
-
-Blue Radar/Shield icons showing sensor nodes.
-
-sensor_detections_layer.csv
-
-Latitude, Longitude
-
-Track_ID
-
-Small point clusters grouped by Tracking State.
+| Layer Source CSV | Spatial Column Selection | Label / Title Column | Visual Styling Tips |
+| :--- | :--- | :--- | :--- |
+| `targets_layer.csv` | Latitude, Longitude | `Target_Name` | Red Flags (🏢) for critical structures. |
+| `flight_vectors_layer.csv` | WKT (Well-Known Text) | `Vector_ID` | Group styles by classification (solid lines). |
+| `sensor_network_layer.csv` | Latitude, Longitude | `Sensor_Node_ID` | Blue Radar/Shield icons showing sensor nodes. |
+| `sensor_detections_layer.csv` | Latitude, Longitude | `Track_ID` | Small point clusters grouped by Tracking State. |
