@@ -1,8 +1,20 @@
 # SAPIENT Synthetic Data Generator (SDG)
 
-The SAPIENT Synthetic Data Generator (SDG) is a data-driven, highly configurable simulation framework designed to generate realistic, multi-sensor surveillance and tracking data for arbitrary operational scenarios. By combining user-defined environmental inputs with advanced sensor error modeling, the platform generates synthetic, SAPIENT-compliant sensor streams that emulate how real-world surveillance networks observe, track, classify, and report physical activity.
+The SAPIENT Synthetic Data Generator (SDG) is a configurable, data-driven simulation framework for generating realistic multi-sensor surveillance and tracking data across arbitrary operational scenarios.
 
-High-quality multi-sensor datasets are often scarce, expensive to collect, operationally sensitive, or completely unavailable. The SDG addresses this critical bottleneck by decoupling data generation from specific geographic regions, threat models, or hardware deployments. It serves as an on-demand engine to rapidly build, test, and validate command-and-control (C2) systems, sensor fusion platforms, autonomy software, and machine learning models without dependence on live-field exercises or proprietary data networks.
+By combining user-defined environments, simulated entities, and advanced sensor error models, SDG produces synthetic, SAPIENT-compatible sensor streams that emulate how real-world surveillance systems detect, track, classify, and report activity.
+
+High-quality multi-sensor datasets are often difficult to obtain due to cost, operational constraints, limited availability, or sensitivity of real-world deployments. SDG addresses this challenge by enabling rapid generation of realistic synthetic datasets without dependence on specific geographic locations, sensor hardware, or live operational data.
+
+The generated data can be used to develop, test, and validate:
+
+- Command-and-control (C2) systems
+- Sensor fusion pipelines
+- Autonomous systems
+- Situational awareness applications
+- Machine learning and AI models
+
+SDG enables repeatable simulation, scalable experimentation, and accelerated development of SAPIENT-based surveillance and autonomy solutions.
 
 ## 🛠️ System Architecture & Framework Layers
 
