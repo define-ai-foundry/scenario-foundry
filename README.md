@@ -57,7 +57,7 @@ pip install -r requirements.txt
 - Create a `.env`file to `scenario-generator`root
 - Add the API key to the `.env`file as `OPENTOPOGRAPHY_API_KEY`
 
-**Note:** Using OpenTopography is the key for a high fidelity data generation. However, if you have defined the terrain anchors, the data generation will use them as a fallback if the terrain files woud be missing.
+**Note:** Using OpenTopography is the key for a high fidelity data generation. However, if you have defined the terrain anchors, the data generation will use them as a fallback if the terrain files would be missing.
 
 ### Do a test run
 ```bash
@@ -127,10 +127,10 @@ Outputs Generated:
 
 Transform tactical data and sensor message outputs into map-ready CSV files:
 ```bash
-python ./src/export_scenario.py \
-  --scenario data/tactical_scenarios/joensuu_tactical.json \
-  --messages data/generated_output/joensuu_messages.json \
-  --outdir data/export_output/ \
+python ./src/export_scenario.py
+  --scenario data/tactical_scenarios/joensuu_tactical.json
+  --messages data/generated_output/joensuu_messages.json
+  --outdir data/export_output/
   --sample-rate 10
 ```
 OR
@@ -140,7 +140,7 @@ python -m src.export_scenario --location joensuu
 
 ## Geospatial Layer Visualization
 
-Once exported, you can instantly visualize your tactical layers on Google My Maps or standard GIS tools (QGIS, ArcGIS):
+Once exported, you can visualize your tactical layers on Google My Maps or standard GIS tools (QGIS, ArcGIS):
 
 - Open Google My Maps and create a new custom map.
 
@@ -148,7 +148,7 @@ Once exported, you can instantly visualize your tactical layers on Google My Map
 
 | Layer Source CSV | Spatial Column Selection | Label / Title Column | Visual Styling Tips |
 | :--- | :--- | :--- | :--- |
-| `targets_layer.csv` | Latitude, Longitude | `Target_Name` | Red Flags (🏢) for critical structures. |
+| `targets_layer.csv` | Latitude, Longitude | `Target_Name` | Red Flags for critical structures. |
 | `flight_vectors_layer.csv` | WKT (Well-Known Text) | `Vector_ID` | Group styles by classification (solid lines). |
 | `sensor_network_layer.csv` | Latitude, Longitude | `Sensor_Node_ID` | Blue Radar/Shield icons showing sensor nodes. |
 | `sensor_detections_layer.csv` | Latitude, Longitude | `Track_ID` | Small point clusters grouped by Tracking State. |
