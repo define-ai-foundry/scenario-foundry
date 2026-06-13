@@ -39,7 +39,7 @@ Ensure your host machine has Python 3.8+ installed. Clone this repository and in
 
 ### Clone the repository
 ```bash
-git clone [https://github.com/DEFINE-AI-Foundry/scenario-generator.git](https://github.com/DEFINE-AI-Foundry/scenario-generator.git)
+git clone https://github.com/DEFINE-AI-Foundry/scenario-generator.git
 cd scenario-generator
 ```
 
@@ -83,7 +83,7 @@ scenario-generator/
 
 ## Execution Pipeline (Step-by-Step)
 
-The synthetic data generation workflow consists of three simple steps:
+The synthetic data generation workflow consists of two simple steps and optional export:
 ```text
   [ Scenario Config ] ---> ( Run Simulation ) ---> [ SAPIENT Messages ] ---> ( Export Layers ) ---> [ GIS Maps ]
 ```
@@ -102,11 +102,9 @@ python -m src.generate_scenario --scenario joensuu
 
 Outputs Generated:
 
-`joensuu_tactical.json`: An enhanced configuration mapping terrain-refined WKT flight paths alongside target assets and defensive sensor locations.
-
 `joensuu_messages.json`: A chronological database of simulated sensor detection reports formatted in compliance with SAPIENT message standards.
 
-### Step 3: Run the GIS Layer Exporter
+### Step 3: Run the GIS Layer Exporter (optional)
 
 Transform tactical data and sensor message outputs into map-ready CSV files:
 ```bash
@@ -115,19 +113,19 @@ python ./src/export_scenario.py \
   --messages data/generated_output/joensuu_messages.json \
   --outdir data/export_output/ \
   --sample-rate 10
-
+```
 OR
-
+```bash
 python -m src.export_scenario --location joensuu
 ```
 
-## 🗺️ Geospatial Layer Visualization
+## Geospatial Layer Visualization
 
 - Once exported, you can instantly visualize your tactical layers on Google My Maps or standard GIS tools (QGIS, ArcGIS):
 
 - Open Google My Maps and create a new custom map.
 
-- For each generated CSV layer inside data/output/gis_layers/, click Add Layer and select Import:
+- For each generated CSV layer inside data/export_output/, click Add Layer and select Import:
 
 | Layer Source CSV | Spatial Column Selection | Label / Title Column | Visual Styling Tips |
 | :--- | :--- | :--- | :--- |
