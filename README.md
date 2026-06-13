@@ -1,3 +1,4 @@
+<img src="docs/images/joensuu_scenario.png" align="right" width="400">
 # SAPIENT Synthetic Data Generator (SDG)
 
 The SAPIENT Synthetic Data Generator (SDG) is a configurable, data-driven simulation framework for generating realistic multi-sensor surveillance and tracking data across arbitrary operational scenarios.
@@ -48,6 +49,15 @@ cd scenario-generator
 pip install -r requirements.txt
 ```
 
+### Install an API key from opentopography.org
+
+- Register a new account to OpenTopography (or login if you have an account)
+- Within your account, generate an API key
+- Create a `.env`file to `scenario-generator`root
+- Add the API key to the `.env`file as `OPENTOPOGRAPHY_API_KEY`
+
+**Note:** Using OpenTopography is the key for a high fidelity data generation. However, if you have defined the terrain anchors, the data generation will use them as a fallback if the terrain files woud be missing.
+
 ### Do a test run
 ```bash
 python -m src.generate_scenario --scenario joensuu
@@ -90,11 +100,19 @@ The synthetic data generation workflow consists of two simple steps and optional
 
 ### Step 1: Scenario Configuration Setup
 
-Create or modify a manually planned attack scenario (e.g., `data/config/joensuu.json`). Define targets, baseline drone attack flight lines, sensor positions, and terrain anchor elevations inside this file.
+Create or modify a manually planned attack scenario (e.g., `data/config/scenarios/joensuu.json`).
+
+Inside the file, define:
+- targets
+- baseline vectors
+- sensor positions
+- terrain anchor elevations 
+
+You can find detailed instructions form `data/config/scenarios/scenario_guide.md`
 
 ### Step 2: Execute the Generation Engine
 
-Run the main generator to parse your scenario config, refine flight vectors using terrain elevations, emulate target detections, and generate SAPIENT-compliant real-time outputs:
+Run the main generator to parse your scenario configuration, refine flight vectors using terrain elevations, emulate target detections, and generate SAPIENT-compliant real-time outputs:
 ```bash
 # Runs the simulation using input config, fetches terrain, and dumps tactical and message streams
 python -m src.generate_scenario --scenario joensuu
@@ -121,7 +139,7 @@ python -m src.export_scenario --location joensuu
 
 ## Geospatial Layer Visualization
 
-- Once exported, you can instantly visualize your tactical layers on Google My Maps or standard GIS tools (QGIS, ArcGIS):
+Once exported, you can instantly visualize your tactical layers on Google My Maps or standard GIS tools (QGIS, ArcGIS):
 
 - Open Google My Maps and create a new custom map.
 
