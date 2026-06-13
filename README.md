@@ -1,5 +1,5 @@
-<img src="docs/images/joensuu_scenario.png" align="right" width="400">
 # SAPIENT Synthetic Data Generator (SDG)
+<img src="docs/images/joensuu_scenario.png" align="right" width="400">
 
 The SAPIENT Synthetic Data Generator (SDG) is a configurable, data-driven simulation framework for generating realistic multi-sensor surveillance and tracking data across arbitrary operational scenarios.
 
@@ -16,6 +16,7 @@ The generated data can be used to develop, test, and validate:
 - Machine learning and AI models
 
 SDG enables repeatable simulation, scalable experimentation, and accelerated development of SAPIENT-based surveillance and autonomy solutions.
+<br clear="right"/>
 
 ## Key Features
 
