@@ -8,9 +8,9 @@ import argparse
 import math
 import urllib.request
 import ssl
-import src.config
+from scenario_foundry import config
 
-DEFAULT_CACHE_DIR = str(src.config.TERRAIN_DIR)
+DEFAULT_CACHE_DIR = str(config.TERRAIN_DIR)
 
 def parse_wkt_points(wkt_str):
     points = []
@@ -76,7 +76,7 @@ def main():
     with open(args.scenario, 'r', encoding='utf-8') as f:
         scenario = json.load(f)
 
-    api_key = args.api_key if args.api_key else src.config.OPENTOPOGRAPHY_API_KEY
+    api_key = args.api_key if args.api_key else config.OPENTOPOGRAPHY_API_KEY
     
     if not api_key:
         print("Error: OpenTopography API key is required. Provide it via --api-key or set OPENTOPOGRAPHY_API_KEY in .env")

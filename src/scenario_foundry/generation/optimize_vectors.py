@@ -6,9 +6,9 @@ import os
 import math
 import argparse
 import re
-import src.config
+from scenario_foundry import config
 
-DEFAULT_CACHE_DIR = str(src.config.TERRAIN_DIR)
+DEFAULT_CACHE_DIR = str(config.TERRAIN_DIR)
 GRID_CACHE = {}
 
 def read_elevation_from_local_asc(lat, lon, cache_dir):

@@ -8,7 +8,7 @@ import re
 import argparse
 from datetime import datetime, timedelta
 import random
-import src.config
+from scenario_foundry import config
 
 # --- GEOSPATIAL & CELESTIAL MATH LIBRARY ---
 def haversine_dist(lat1, lon1, lat2, lon2):
@@ -46,7 +46,7 @@ def calculate_solar_elevation(lat, lon, dt):
 # --- UPGRADED: HIGH-PERFORMANCE MEMORY CACHED ARC ASCII GRID ENGINE ---
 SIM_GRID_CACHE = {}
 
-def read_elevation_from_local_asc(lat, lon, cache_dir=str(src.config.TERRAIN_DIR)):
+def read_elevation_from_local_asc(lat, lon, cache_dir=str(config.TERRAIN_DIR)):
     """
     High-Performance Plaintext Arc ASCII Grid Parser.
     Keeps the generation engine 100% offline and perfectly aligned with optimize_vectors.py
@@ -114,7 +114,7 @@ def get_terrain_elevation(lat, lon, scenario_config):
     Samples verified plaintext ASCII data grids from local cache.
     If files are missing, falls back to local Inverse Distance Weighting (IDW) anchors.
     """
-    raster_alt = read_elevation_from_local_asc(lat, lon, cache_dir=str(src.config.TERRAIN_DIR))
+    raster_alt = read_elevation_from_local_asc(lat, lon, cache_dir=str(config.TERRAIN_DIR))
     if raster_alt is not None:
         return raster_alt
 
@@ -171,7 +171,7 @@ def calculate_dynamic_confidence(dist, max_range, sensor_type):
 def main():
     parser = argparse.ArgumentParser(description="Synchronized Plaintext ASC SAPIENT Telemetry Generator")
     parser.add_argument("--scenario", required=True, help="Path to tactical optimized scenario json file")
-    parser.add_argument("--output", default=str(src.config.GENERATED_DIR), help="Output telemetry log file path")
+    parser.add_argument("--output", default=str(config.GENERATED_DIR), help="Output telemetry log file path")
     args = parser.parse_args()
 
     if not os.path.exists(args.scenario):
@@ -188,9 +188,9 @@ def main():
     print(f"Executing Synchronized Generation Engine Theater: {meta['name']}")
     
     threat_waves = {}
-    for wave_id, config in scenario["threat_profiles"].items():
-        config["waypoints"] = parse_wkt(config["wkt_linestring"])
-        threat_waves[wave_id] = config
+    for wave_id, wave_cfg in scenario["threat_profiles"].items():
+        wave_cfg["waypoints"] = parse_wkt(wave_cfg["wkt_linestring"])
+        threat_waves[wave_id] = wave_cfg
 
     json_log = []
 

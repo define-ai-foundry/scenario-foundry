@@ -13,12 +13,11 @@ Validates:
 - sensor network definitions
 """
 
-from email.policy import default
 import json
 import pathlib
 import datetime
 import argparse
-import src.config as config
+from scenario_foundry import config
 
 from jsonschema import validate, ValidationError
 from shapely import wkt
@@ -214,15 +213,20 @@ def validate_scenario(
 
 def main():
     parser = argparse.ArgumentParser(description="Validate a scenario file against its schema")
-    parser.add_argument("--scenario", required=True, help="Path to the scenario file")
+    parser.add_argument("--scenario", default=None, help="Path to the scenario file")
+    parser.add_argument("--location", default=None, help="Optional location name used in place of --scenario")
     parser.add_argument("--schema", default=config.SCHEMA_DIR / "scenario.schema.json", help="Path to the schema file")
     args = parser.parse_args()
 
-    # 1. If scenario argument is missng .json extension, append it
+    # 1. If location argument is provided, use it to resolve the scenario path
+    if args.location:
+        args.scenario = args.location
+
+    # 2. If scenario argument is missing .json extension, append it
     if not args.scenario.endswith(".json"):
         args.scenario += ".json"
 
-    # 2. Resolve the absolute path for the input coarse scenario
+    # 3. Resolve the absolute path for the input coarse scenario
     coarse_scenario_path = config.SCENARIOS_DIR / args.scenario
     if not coarse_scenario_path.exists():
         print(f"[ERROR] Scenario configuration file not found at: {coarse_scenario_path}")

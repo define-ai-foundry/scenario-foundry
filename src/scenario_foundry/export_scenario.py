@@ -6,12 +6,12 @@ import os
 import re
 import csv
 import argparse
-import src.config
+from scenario_foundry import config
 from pathlib import Path
 
-TACTICAL_DIR = str(src.config.TACTICAL_DIR)
-MESSAGES_DIR = str(src.config.GENERATED_DIR)
-OUTPUT_DIR = str(src.config.EXPORT_DIR)
+TACTICAL_DIR = str(config.TACTICAL_DIR)
+MESSAGES_DIR = str(config.GENERATED_DIR)
+OUTPUT_DIR = str(config.EXPORT_DIR)
 
 # --- GEOSPATIAL HELPER FUNCTIONS ---
 def decimate_wkt_linestring(wkt_str, sample_rate=10):
