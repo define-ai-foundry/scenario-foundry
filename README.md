@@ -61,7 +61,7 @@ pip install -r requirements.txt
 
 ### Do a test run
 ```bash
-python -m src.generate_scenario --scenario joensuu
+python -m src.scenario_foundry.generate_scenario --scenario joensuu
 ```
 This accumulates:
 - tactical_vectors
@@ -128,7 +128,7 @@ You can find detailed instructions form `data/config/scenarios/scenario_guide.md
 Run the main generator to parse your scenario configuration, refine flight vectors using terrain elevations, emulate target detections, and generate SAPIENT-compliant real-time outputs:
 ```bash
 # Runs the simulation using input config, fetches terrain, and dumps tactical and message streams
-python -m src.generate_scenario --scenario joensuu
+python -m src.scenario_foundry.generate_scenario --scenario joensuu
 ```
 
 Outputs Generated:
@@ -147,7 +147,7 @@ python ./src/export_scenario.py
 ```
 OR
 ```bash
-python -m src.export_scenario --location joensuu
+python -m src.scenario_foundry.export_scenario --location joensuu
 ```
 
 ## Geospatial Layer Visualization
