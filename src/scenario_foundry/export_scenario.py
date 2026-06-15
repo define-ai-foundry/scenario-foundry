@@ -3,11 +3,15 @@
 
 import json
 import os
+import sys
 import re
 import csv
 import argparse
-from scenario_foundry import config
 from pathlib import Path
+from src.scenario_foundry import config
+
+# Ensure Python can discover modules inside the src/ directory
+sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 TACTICAL_DIR = str(config.TACTICAL_DIR)
 MESSAGES_DIR = str(config.GENERATED_DIR)
