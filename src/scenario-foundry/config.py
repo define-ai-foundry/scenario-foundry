@@ -6,7 +6,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # Project root directory
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 # Load environment variables from .env file
 load_dotenv(PROJECT_ROOT / ".env")
@@ -15,6 +15,7 @@ load_dotenv(PROJECT_ROOT / ".env")
 CONFIG_DIR = PROJECT_ROOT / "config"
 SCENARIOS_DIR = CONFIG_DIR / "scenarios"
 SCHEMA_DIR = CONFIG_DIR / "schemas"
+
 DATA_DIR = PROJECT_ROOT / "data"
 TERRAIN_DIR = DATA_DIR / "terrain"
 TACTICAL_DIR = DATA_DIR / "tactical_scenarios"
