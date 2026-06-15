@@ -69,27 +69,39 @@ This accumulates:
 
 ### Repository Directory Structure
 
-The workspace is organized into modular directories following standard  development patterns:
+The workspace is organized into modular directories following standard development patterns:
 ```text
-scenario-generator/
-├── config/
-│   ├── scenarios/            # Scenario configuration templates (.json)
-│   └── schemas/              # Schema files needed for validations
-├── data/
-│   ├── export_output/        # Exported data for external consumption (.csv) (not committed)
-│   ├── generated_output/     # Simulation output messages (.json) (not committed)
-│   ├── tactical_scenarios/   # Scenarios with enhanced features (.json) (not committed)
-│   └── terrain/              # Terrain data from OpenTopography (.asc) (not committed)
-├── src/
-│   ├── generation/           # Modules of scenario generation pipeline
-│   ├── validation/           # Validation scripts, e.g. for templates
-│   ├── config.py             # Global run parameter setups
-│   ├── export_scenario.py    # Exports CSV files for scenario layers
-│   └── generate_scenario.py  # Scenario generation pipeline code
-├── tests/                    # Test automation
-├── LICENSE                   # Licensing legal terms
-├── README.md                 # System documentation
-└── requirements.txt          # Project requirements manifest
+scenario-foundry/
+├─ config/
+│  ├─ scenarios/
+│  │  ├─ joensuu.json
+│  │  └─ scenario_guide.md
+│  └─ schemas/
+│     └─ scenario.schema.json
+├─ data/
+│  ├─ export_output/
+│  ├─ generated_output/
+│  ├─ tactical_scenarios/
+│  └─ terrain/
+├─ docs/
+│  └─ images/
+│     └─ joensuu_scenario.png
+├─ src/
+│  └─ scenario_foundry/
+│     ├─ generation/
+│     │  ├─ fetch_terrain.py
+│     │  ├─ generate_sensor_data.py
+│     │  └─ optimize_vectors.py
+│     ├─ validation/
+│     │  └─ validate.py
+│     ├─ config.py
+│     ├─ export_scenario.py
+│     └─ generate_scenario.py
+├─ tests/
+├─ LICENSE
+├─ README.md
+└─ requirements.txt
+
 ```
 
 ## Execution Pipeline (Step-by-Step)
