@@ -109,52 +109,125 @@ def export_sensor_network(tactical_data, output_dir):
     print(f"[SUCCESS] Exported Sensor Network Layer: {output_path}")
 
 def export_sensor_detections(messages_data, output_dir):
-    """Flattens incoming SAPIENT sensor data messages into a dynamic layer."""
-    output_path = os.path.join(output_dir, "sensor_detections_layer.csv")
-    
+    """Flattens Flex 335 SAPIENT sensor data messages into a dynamic layer."""
+
+    output_path = os.path.join(
+        output_dir,
+        "sensor_detections_layer.csv"
+    )
+
     fields = [
-        'Timestamp', 'Sensor_Node_ID', 'Track_ID', 'Status', 'Drone_Type', 
-        'Confidence', 'Latitude', 'Longitude', 'Elevation_M', 'Swarm_Count'
+        'Timestamp',
+        'Sensor_Node_ID',
+        'Track_ID',
+        'Status',
+        'Drone_Type',
+        'Confidence',
+        'Latitude',
+        'Longitude',
+        'Elevation_M',
+        'Swarm_Count'
     ]
-    
+
     with open(output_path, 'w', newline='', encoding='utf-8') as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=fields)
+
+        writer = csv.DictWriter(
+            csvfile,
+            fieldnames=fields
+        )
+
         writer.writeheader()
-        
+
         for entry in messages_data:
+
             msg = entry.get("sapientMessage", {})
+
             header = msg.get("header", {})
             report = msg.get("detectionReport", {})
-            
-            class_list = report.get("classificationList", [])
+
+            # Classification
+            class_list = report.get("classification", [])
+
             drone_type = "UNKNOWN"
             confidence = 0.0
-            if isinstance(class_list, list) and len(class_list) > 0:
-                drone_type = class_list[0].get("type", "UNKNOWN")
-                confidence = class_list[0].get("confidence", 0.0)
-            
-            location = report.get("locationList", {}).get("location", {})
-            bearing_loc = report.get("bearingList", {})
-            
-            lat = location.get('latitude') if location.get('latitude') is not None else bearing_loc.get('sensorLatitude')
-            lon = location.get('longitude') if location.get('longitude') is not None else bearing_loc.get('sensorLongitude')
-            alt = location.get('elevation', 0.0)
-            
-            attributes = report.get("measuredAttributes", {})
-            
+
+            if class_list:
+                drone_type = class_list[0].get(
+                    "type",
+                    "UNKNOWN"
+                )
+
+                confidence = class_list[0].get(
+                    "confidence",
+                    0.0
+                )
+
+
+            # Flex 335 Location
+            location = report.get(
+                "location",
+                {}
+            )
+
+            lon = location.get("x")
+            lat = location.get("y")
+            alt = location.get("z",0.0)
+
+
+            attributes = report.get(
+                "measuredAttributes",
+                {}
+            )
+
+
             writer.writerow({
-                'Timestamp': header.get('timestamp'),
-                'Sensor_Node_ID': header.get('nodeId'),
-                'Track_ID': report.get('trackId'),
-                'Status': report.get('state'),
-                'Drone_Type': drone_type,
-                'Confidence': confidence,
-                'Latitude': lat,
-                'Longitude': lon,
-                'Elevation_M': alt,
-                'Swarm_Count': attributes.get('estimatedSwarmCount', 1)
+
+                'Timestamp':
+                    header.get("timestamp"),
+
+                'Sensor_Node_ID':
+                    header.get(
+                        "sourceNode",
+                        {}
+                    ).get(
+                        "nodeId"
+                    ),
+
+                'Track_ID':
+                    report.get(
+                        "objectId"
+                    ),
+
+                'Status':
+                    report.get(
+                        "state"
+                    ),
+
+                'Drone_Type':
+                    drone_type,
+
+                'Confidence':
+                    confidence,
+
+                'Latitude':
+                    lat,
+
+                'Longitude':
+                    lon,
+
+                'Elevation_M':
+                    alt,
+
+                'Swarm_Count':
+                    attributes.get(
+                        "estimatedSwarmCount",
+                        1
+                    )
             })
-    print(f"[SUCCESS] Exported Sensor Detections Layer: {output_path}")
+
+    print(
+        f"[SUCCESS] Exported Sensor Detections Layer: {output_path}"
+    )
 
 #  --- INPUT RESOLVER ---
 def resolve_input(value, directory, suffix, location=None):

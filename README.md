@@ -41,13 +41,15 @@ Ensure your host machine has Python 3.8+ installed. Clone this repository and in
 
 ### Clone the repository
 ```bash
-git clone https://github.com/DEFINE-AI-Foundry/scenario-generator.git
-cd scenario-generator
+git clone https://github.com/DEFINE-AI-Foundry/scenario-foundry.git
+cd scenario-foundry
 ```
 
-### Install Python requirements
+### Install Python requirements and the project
 ```bash
 pip install -r requirements.txt
+
+pip install -e .
 ```
 
 ### Install an API key from opentopography.org
@@ -87,21 +89,33 @@ scenario-foundry/
 │  └─ images/
 │     └─ joensuu_scenario.png
 ├─ src/
-│  └─ scenario_foundry/
-│     ├─ generation/
-│     │  ├─ fetch_terrain.py
-│     │  ├─ generate_sensor_data.py
-│     │  └─ optimize_vectors.py
-│     ├─ validation/
-│     │  └─ validate.py
-│     ├─ config.py
-│     ├─ export_scenario.py
-│     └─ generate_scenario.py
+│  ├─ sapient_msg/
+│  │  ├─ bsi_flex_335_v2_0/
+│  │  │  ├─ associated_detection_pb2.py
+│  │  │  ├─ associated_file_pb2.py
+│  │  │  ├─ detection_report_pb2.py
+│  │  │  ├─ location_pb2.py
+│  │  │  ├─ range_bearing_pb2.py
+│  │  │  └─ velocity_pb2.py
+│  │  └─ proto_options_pb2.py
+│  ├─ scenario_foundry/
+│  │  ├─ generation/
+│  │  │  ├─ fetch_terrain.py
+│  │  │  ├─ generate_sensor_data.py
+│  │  │  └─ optimize_vectors.py
+│  │  ├─ sapient/
+│  │  │  └─ builder.py
+│  │  ├─ validation/
+│  │  │  └─ validate.py
+│  │  ├─ config.py
+│  │  ├─ export_scenario.py
+│  │  └─ generate_scenario.py
+│  └─ scenario_foundry.egg-info/
 ├─ tests/
 ├─ LICENSE
+├─ pyproject.toml
 ├─ README.md
 └─ requirements.txt
-
 ```
 
 ## Execution Pipeline (Step-by-Step)

@@ -10,6 +10,17 @@ from datetime import datetime, timedelta
 import random
 from scenario_foundry import config
 
+from scenario_foundry.sapient.builder import (
+    make_location,
+    make_velocity,
+    make_range_bearing
+)
+
+# --- PROTOBUF IMPORTS ---
+from google.protobuf import json_format
+from sapient_msg.bsi_flex_335_v2_0 import detection_report_pb2
+from sapient_msg.bsi_flex_335_v2_0 import location_pb2 
+
 # --- GEOSPATIAL & CELESTIAL MATH LIBRARY ---
 def haversine_dist(lat1, lon1, lat2, lon2):
     R = 6371000
@@ -43,14 +54,19 @@ def calculate_solar_elevation(lat, lon, dt):
     sin_sol = math.sin(lat_rad) * math.sin(dec_rad) + math.cos(lat_rad) * math.cos(dec_rad) * math.cos(ha_rad)
     return math.degrees(math.asin(max(-1.0, min(1.0, sin_sol))))
 
+def make_wgs84_location(lat, lon, alt):
+    return {
+        "x": round(lon, 6),
+        "y": round(lat, 6),
+        "z": round(alt, 1),
+        "coordinateSystem": "LOCATION_COORDINATE_SYSTEM_LAT_LNG_DEG_M",
+        "datum": "LOCATION_DATUM_WGS84_E"
+    }
+
 # --- UPGRADED: HIGH-PERFORMANCE MEMORY CACHED ARC ASCII GRID ENGINE ---
 SIM_GRID_CACHE = {}
 
 def read_elevation_from_local_asc(lat, lon, cache_dir=str(config.TERRAIN_DIR)):
-    """
-    High-Performance Plaintext Arc ASCII Grid Parser.
-    Keeps the generation engine 100% offline and perfectly aligned with optimize_vectors.py
-    """
     lat_floor = int(math.floor(lat))
     lon_floor = int(math.floor(lon))
     lat_pfx = f"N{lat_floor:02d}" if lat_floor >= 0 else f"S{abs(lat_floor):02d}"
@@ -61,12 +77,10 @@ def read_elevation_from_local_asc(lat, lon, cache_dir=str(config.TERRAIN_DIR)):
     if not os.path.exists(asc_path):
         return None
         
-    # Ingest file contents into memory on first call to maximize step loop performance
     if asc_name not in SIM_GRID_CACHE:
         try:
             with open(asc_path, "r", encoding="utf-8") as f:
                 header = {}
-                # Parse standard ESRI Arc ASCII 6-line metadata blocks
                 for _ in range(6):
                     line_tokens = f.readline().strip().split()
                     header[line_tokens[0].lower()] = float(line_tokens[1])
@@ -91,14 +105,10 @@ def read_elevation_from_local_asc(lat, lon, cache_dir=str(config.TERRAIN_DIR)):
     nrows = int(hdr["nrows"])
     ncols = int(hdr["ncols"])
     
-    # Calculate column index relative to Western edge
     col = int((lon - hdr["xllcorner"]) / cell_size)
-    
-    # Correct North-to-South row index calculation matching ESRI ASCII specifications
     y_top = hdr["yllcorner"] + (nrows * cell_size)
     row = int((y_top - lat) / cell_size)
     
-    # Secure array boundaries via clamp safety nets
     row = max(0, min(row, nrows - 1))
     col = max(0, min(col, ncols - 1))
     
@@ -109,16 +119,10 @@ def read_elevation_from_local_asc(lat, lon, cache_dir=str(config.TERRAIN_DIR)):
         return None
 
 def get_terrain_elevation(lat, lon, scenario_config):
-    """
-    100% OFFLINE HYBRID ELEVATION PIPELINE:
-    Samples verified plaintext ASCII data grids from local cache.
-    If files are missing, falls back to local Inverse Distance Weighting (IDW) anchors.
-    """
     raster_alt = read_elevation_from_local_asc(lat, lon, cache_dir=str(config.TERRAIN_DIR))
     if raster_alt is not None:
         return raster_alt
 
-    # Fallback Mode: IDW Mathematical Matrix
     anchors = scenario_config.get("terrain_elevation_anchors", [])
     if not anchors: return 80.0
     total_weight, weighted_elevation = 0.0, 0.0
@@ -129,7 +133,6 @@ def get_terrain_elevation(lat, lon, scenario_config):
         weighted_elevation += anchor["elevation_msl"] * weight
     return weighted_elevation / total_weight
 
-# --- TELEMETRY & SIGNAL PROCESSING ---
 def parse_wkt(wkt_str):
     points = []
     match = re.search(r'LINESTRING\s*\((.*)\)', wkt_str, re.IGNORECASE)
@@ -167,7 +170,7 @@ def calculate_dynamic_confidence(dist, max_range, sensor_type):
         base_conf = 0.50 + (0.45 * proximity_ratio)
     return round(max(0.10, min(0.99, base_conf + scintillation)), 2)
 
-# --- MAIN GENEATION ENGINE ---
+# --- MAIN GENERATION ENGINE ---
 def main():
     parser = argparse.ArgumentParser(description="Synchronized Plaintext ASC SAPIENT Telemetry Generator")
     parser.add_argument("--scenario", required=True, help="Path to tactical optimized scenario json file")
@@ -217,7 +220,6 @@ def main():
                 dist = haversine_dist(sens["lat"], sens["lon"], lat, lon)
                 if dist > sens["range_m"]: continue
                 
-                # Resolves natively via cached plaintext .asc row matrix elements
                 ground_height_msl = get_terrain_elevation(lat, lon, scenario)
                 current_agl = wave["alt_m"]
                 if is_final_leg and wave["classification"] != "UAV_Decoy":
@@ -226,7 +228,6 @@ def main():
                 absolute_altitude_msl = ground_height_msl + current_agl
                 if sens["type"] == "RADAR_STRATEGIC" and absolute_altitude_msl < 100: continue
                 
-                # Apply geodetic track logging noise
                 noisy_lat, noisy_lon = lat, lon
                 if "RADAR" in sens["type"]:
                     sigma_meters = 5.0 + (30.0 * (dist / sens["range_m"]))
@@ -243,52 +244,133 @@ def main():
                     solar_elevation = calculate_solar_elevation(sens["lat"], sens["lon"], current_sim_time)
                     if solar_elevation <= -6.0: calculated_conf = 0.12
 
-                msg = {
-                    "sapientMessage": {
-                        "header": {"timestamp": ts_str, "nodeId": sens["id"], "messageType": "DetectionReport"},
-                        "detectionReport": {"state": "Active", "classificationList": [{"type": wave["classification"], "confidence": calculated_conf}]}
-                    }
+                # -------------------------------------------------------------
+                # START REFACTOR: BSI FLEX 335 v2.0 STRICT COMPLIANCE BLOCK
+                # -------------------------------------------------------------
+                
+                # 1. Build the Complex Detection Report Dictionary
+                rep_dict = {
+                    "state": "ACTIVE",   
+                    "classification": [{
+                        "type": wave["classification"].upper(), 
+                        "confidence": calculated_conf
+                    }]
                 }
-                rep = msg["sapientMessage"]["detectionReport"]
-                s_code = f"A-0{sens['id'][-1:] if sens['id'][-1:].isdigit() else '1'}"
+                
                 pfx = wave_id[:2]
+                s_code = f"A-0{sens['id'][-1:] if sens['id'][-1:].isdigit() else '1'}"
                 is_diving = (is_final_leg and wave["classification"] != "UAV_Decoy")
 
+                # We hold custom simulation attributes here to bypass strict core validation
+                extra_attributes = {}
+
+                # 2. Append Sensor Payloads directly to rep_dict. 
+                # EVERY location block MUST USE WGS84_STR dynamically.
                 if "RADAR" in sens["type"] and dist > 8000:
-                    rep["trackId"] = f"{s_code}-SWM-{pfx}_{wave['id_suffix']}"
-                    rep["locationList"] = {"coordinateSystem": "WGS84", "location": {"latitude": round(noisy_lat, 5), "longitude": round(noisy_lon, 5), "elevation": round(absolute_altitude_msl, 1)}}
-                    rep["measuredAttributes"] = {"estimatedSwarmCount": wave["count"]}
-                    if is_diving: rep["measuredAttributes"]["tacticalState"] = "Terminal_Dive"
+                    rep_dict["objectId"] = f"{s_code}-SWM-{pfx}_{wave['id_suffix']}"
+                    rep_dict["location"] = make_location(
+                        noisy_lat,
+                        noisy_lon,
+                        absolute_altitude_msl
+                    )
+                    extra_attributes["measuredAttributes"] = {"estimatedSwarmCount": wave["count"]}
+                    if is_diving: 
+                        extra_attributes["measuredAttributes"]["tacticalState"] = "TERMINAL_DIVE"
                     
                 elif sens["type"] in ["MICRO_DOPPLER", "RADAR_TACTICAL"] and dist <= 8000:
-                    rep["trackId"] = f"{s_code}-IND-{pfx}_{wave['id_suffix']}_0{wave['count'] - 2}"
-                    rep["locationList"] = {"coordinateSystem": "WGS84", "location": {"latitude": round(noisy_lat, 6), "longitude": round(noisy_lon, 6), "elevation": round(absolute_altitude_msl, 1)}}
+                    rep_dict["objectId"] = f"{s_code}-IND-{pfx}_{wave['id_suffix']}_0{wave['count'] - 2}"
+                    rep_dict["location"] = make_location(
+                        noisy_lat,
+                        noisy_lon,
+                        absolute_altitude_msl
+                    )
                     v_up = -15.0 if is_diving else 0.0
-                    rep["velocity"] = {"east": round(mps * math.sin(math.radians(brg)), 1), "north": round(mps * math.cos(math.radians(brg)), 1), "up": v_up}
+                                        
+                    east = mps * math.sin(math.radians(brg))
+                    north = mps * math.cos(math.radians(brg))
+
+                    rep_dict["enuVelocity"] = make_velocity(
+                        east,
+                        north,
+                        v_up
+                    )
+
                     if sens["type"] == "MICRO_DOPPLER":
-                        rep["measuredAttributes"] = {"microDopplerRotorSpeedRps": 220.0 if "FPV" in wave["classification"] else 75.0}
-                        if is_diving: rep["measuredAttributes"]["maneuverState"] = "High_G_Dive"
+                        extra_attributes["measuredAttributes"] = {"microDopplerRotorSpeedRps": 220.0 if "FPV" in wave["classification"] else 75.0}
+                        if is_diving: 
+                            extra_attributes["measuredAttributes"]["maneuverState"] = "HIGH_G_DIVE"
                         
                 elif sens["type"] == "ACOUSTIC":
-                    rep["trackId"] = f"ACU-{s_code}_{pfx}_{wave['id_suffix']}"
+                    rep_dict["objectId"] = f"ACU-{s_code}_{pfx}_{wave['id_suffix']}"
                     noisy_bearing = (calc_bearing(sens["lat"], sens["lon"], lat, lon) + random.gauss(0, 3.5)) % 360
-                    rep["bearingOnlyLocation"] = {"coordinateSystem": "WGS84", "sensorLatitude": sens["lat"], "sensorLongitude": sens["lon"], "azimuthDegrees": round(noisy_bearing, 1)}
+                    
+                    rep_dict["rangeBearing"] = make_range_bearing(
+                        noisy_bearing,
+                        dist
+                    )
                     
                 elif sens["type"] == "THERMAL_CAM" and dist <= 4000:
-                    rep["trackId"] = f"CAM-{s_code}_{pfx}_{wave['id_suffix']}"
-                    rep["locationList"] = {"coordinateSystem": "WGS84", "location": {"latitude": round(noisy_lat, 6), "longitude": round(noisy_lon, 6), "elevation": round(absolute_altitude_msl, 1)}}
-                    rep["opticalAttributes"] = {"spectrumChannel": "LWIR_Thermal", "visualConfirmation": "Positive", "targetThermalIntensity": "High"}
+                    rep_dict["objectId"] = f"CAM-{s_code}_{pfx}_{wave['id_suffix']}"
+                    rep_dict["location"] = make_location(
+                        noisy_lat,
+                        noisy_lon,
+                        absolute_altitude_msl
+                    )
+                    extra_attributes["opticalAttributes"] = {
+                        "spectrumChannel": "LWIR_THERMAL", 
+                        "visualConfirmation": "POSITIVE", 
+                        "targetThermalIntensity": "HIGH"
+                    }
                 
                 elif sens["type"] == "VISUAL_CAM" and dist <= 3000:
                     solar_elevation = calculate_solar_elevation(sens["lat"], sens["lon"], current_sim_time)
-                    rep["trackId"] = f"CAM-{s_code}_{pfx}_{wave['id_suffix']}"
-                    rep["locationList"] = {"coordinateSystem": "WGS84", "location": {"latitude": round(noisy_lat, 6), "longitude": round(noisy_lon, 6), "elevation": round(absolute_altitude_msl, 1)}}
+                    rep_dict["objectId"] = f"CAM-{s_code}_{pfx}_{wave['id_suffix']}"
+                    rep_dict["location"] = make_location(
+                        noisy_lat,
+                        noisy_lon,
+                        absolute_altitude_msl
+                    )
                     if solar_elevation > -6.0:
-                        rep["opticalAttributes"] = {"spectrumChannel": "Visible_Color", "visualConfirmation": "Positive", "illuminationStatus": "Optimal"}
+                        extra_attributes["opticalAttributes"] = {"spectrumChannel": "VISIBLE_COLOR", "visualConfirmation": "POSITIVE", "illuminationStatus": "OPTIMAL"}
                     else:
-                        rep["opticalAttributes"] = {"spectrumChannel": "Visible_Color", "visualConfirmation": "Unconfirmed", "illuminationStatus": "Poor_Blind"}
+                        extra_attributes["opticalAttributes"] = {"spectrumChannel": "VISIBLE_COLOR", "visualConfirmation": "UNCONFIRMED", "illuminationStatus": "POOR_BLIND"}
 
-                json_log.append(msg)
+                # 3. The Modular Validation Sandbox
+                try:
+                    # Validate the STRICT core payload
+                    proto_rep = detection_report_pb2.DetectionReport()
+                    json_format.ParseDict(rep_dict, proto_rep, ignore_unknown_fields=False)
+                    valid_rep = json_format.MessageToDict(
+                        proto_rep, 
+                        preserving_proto_field_name=False, 
+                        always_print_fields_with_no_presence=True
+                    )
+                    
+                    # Inject custom/extension attributes back into the validated payload safely
+                    valid_rep.update(extra_attributes)
+                    
+                    # 4. Manually stitch into the required top-level SAPIENT JSON structure
+                    json_log.append({
+                        "sapientMessage": {
+                            "header": {
+                                "icdVersion": "2.0",
+                                "timestamp": ts_str,
+                                "sourceNode": {
+                                    "nodeId": str(sens["id"]),
+                                    "type": "CHILD"
+                                }
+                            },
+                            "detectionReport": valid_rep
+                        }
+                    })
+                    
+                except Exception as e:
+                    print(f"CRITICAL PROTOC VALIDATION ERROR at step {step}: {e}")
+                    raise 
+
+                # -------------------------------------------------------------
+                # END REFACTOR BLOCK
+                # -------------------------------------------------------------
 
     json_log.sort(key=lambda x: x["sapientMessage"]["header"]["timestamp"])
 

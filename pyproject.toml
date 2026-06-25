@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "scenario-foundry"
+version = "0.1.0"
+description = "SAPIENT Network Tactical Scenario and Sensor Telemetry Generator"
+authors = [
+    { name = "Lempea Edge Oy / DEFINE AI Foundry" }
+]
+readme = "README.md"
+requires-python = ">=3.8"
+
+# These are the packages installed automatically when someone runs `pip install -e .`
+dependencies = [
+    "protobuf>=4.21.0",
+    # Note: If your export_scenario.py uses external libraries like pandas or 
+    # geopandas to make the CSV files, add them here too! (e.g., "pandas>=2.0.0")
+]
+
+# OPTIONAL BUT HIGHLY RECOMMENDED: 
+# This turns your scripts into system-wide command line tools.
+[project.scripts]
+generate-scenario = "scenario_foundry.generate_scenario:main"
+generate-sensor-data = "scenario_foundry.generate_sensor_data:main"
+export-scenario = "scenario_foundry.export_scenario:main"
+
+# This is the magic that fixes your ModuleNotFoundError. 
+# It tells Python that your actual code is hidden inside the src/ folder.
+[tool.setuptools.packages.find]
+where = ["src"]
