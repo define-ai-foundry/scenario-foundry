@@ -1,6 +1,6 @@
 python-dotenv==1.1.1
 jsonschema
 shapely
-protobuf>=4.21.0
+protobuf>=4.25.8
 zipp>=3.19.1 # not directly required, pinned by Snyk to avoid a vulnerability
 numpy>=1.22.0 # not directly required, pinned by Snyk to avoid a vulnerability
