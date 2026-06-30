@@ -14,9 +14,12 @@ requires-python = ">=3.8"
 
 # These are the packages installed automatically when someone runs `pip install -e .`
 dependencies = [
-    "protobuf>=4.21.0",
-    # Note: If your export_scenario.py uses external libraries like pandas or 
-    # geopandas to make the CSV files, add them here too! (e.g., "pandas>=2.0.0")
+    "python-dotenv==1.1.1",
+    "jsonschema",
+    "shapely",
+    "protobuf>=4.25.8",
+    "zipp>=3.19.1",
+    "numpy>=1.22.0"
 ]
 
 # OPTIONAL BUT HIGHLY RECOMMENDED: 
