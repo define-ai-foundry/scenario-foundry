@@ -22,7 +22,15 @@ def main():
         required=True,
         help="Name of the scenario file inside config/scenarios/ (e.g., joensuu.json or just joensuu)",
     )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help="Integer RNG seed for reproducible output. Omit for non-deterministic runs.",
+    )
     args = parser.parse_args()
+
+    seed_args = ["--seed", str(args.seed)] if args.seed is not None else []
 
     # 1. If scenario argument is missng .json extension, append it
     if not args.scenario.endswith(".json"):
@@ -58,6 +66,7 @@ def main():
         str(coarse_scenario_path),
         "--output",
         str(tactical_scenario_path),
+        *seed_args,
     ]
     try:
         run_optimize_vectors()
@@ -74,6 +83,7 @@ def main():
         str(tactical_scenario_path),
         "--output",
         str(generated_output_path),
+        *seed_args,
     ]
     try:
         run_generate_sensor_data()

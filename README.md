@@ -149,6 +149,16 @@ Outputs Generated:
 
 `joensuu_messages.json`: A chronological database of simulated sensor detection reports formatted in compliance with SAPIENT message standards.
 
+#### Reproducibility
+
+Pass an integer `--seed` to make a run fully reproducible — identical input plus identical seed always produces identical output:
+```bash
+# Reproducible run: identical output every time for a given seed
+python -m src.scenario_foundry.generate_scenario --scenario joensuu --seed 42
+```
+
+The flag is accepted by `generate_scenario`, `generate_sensor_data`, and `optimize_vectors`. Omitting it preserves the default non-deterministic behavior.
+
 ### Step 3: Run the GIS Layer Exporter (optional)
 
 Transform tactical data and sensor message outputs into map-ready CSV files:

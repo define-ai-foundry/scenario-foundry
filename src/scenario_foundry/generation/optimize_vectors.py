@@ -8,6 +8,7 @@ import os
 import re
 
 from scenario_foundry import config
+from scenario_foundry.rng import seed_all
 
 DEFAULT_CACHE_DIR = str(config.TERRAIN_DIR)
 GRID_CACHE = {}
@@ -185,7 +186,16 @@ def main():
     parser.add_argument("--scenario", required=True)
     parser.add_argument("--cache", default=DEFAULT_CACHE_DIR)
     parser.add_argument("--output", default=None)
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help="Integer RNG seed for reproducible output. Omit for non-deterministic runs.",
+    )
     args = parser.parse_args()
+
+    if args.seed is not None:
+        seed_all(args.seed)
 
     if args.output is None:
         base, ext = os.path.splitext(args.scenario)

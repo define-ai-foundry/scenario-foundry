@@ -14,6 +14,7 @@ from google.protobuf import json_format
 
 from sapient_msg.bsi_flex_335_v2_0 import detection_report_pb2
 from scenario_foundry import config
+from scenario_foundry.rng import seed_all
 from scenario_foundry.sapient.builder import make_location, make_range_bearing, make_velocity
 
 
@@ -191,7 +192,16 @@ def main():
     parser.add_argument(
         "--output", default=str(config.GENERATED_DIR), help="Output telemetry log file path"
     )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help="Integer RNG seed for reproducible output. Omit for non-deterministic runs.",
+    )
     args = parser.parse_args()
+
+    if args.seed is not None:
+        seed_all(args.seed)
 
     if not os.path.exists(args.scenario):
         print(f"ERROR: Target tactical scenario file '{args.scenario}' not found.")
