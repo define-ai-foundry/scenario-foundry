@@ -9,9 +9,9 @@ from scenario_foundry import config
 # Ensure Python can discover modules inside the src/ directory
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
-from src.scenario_foundry.generation.fetch_terrain import main as run_fetch_terrain
-from src.scenario_foundry.generation.optimize_vectors import main as run_optimize_vectors
-from src.scenario_foundry.generation.generate_sensor_data import main as run_generate_sensor_data
+from scenario_foundry.generation.fetch_terrain import main as run_fetch_terrain
+from scenario_foundry.generation.optimize_vectors import main as run_optimize_vectors
+from scenario_foundry.generation.generate_sensor_data import main as run_generate_sensor_data
     
 def main():
     parser = argparse.ArgumentParser(description="SAPIENT Generation Pipeline Orchestrator")

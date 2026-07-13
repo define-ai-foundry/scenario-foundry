@@ -8,7 +8,7 @@ import re
 import csv
 import argparse
 from pathlib import Path
-from src.scenario_foundry import config
+from scenario_foundry import config
 
 # Ensure Python can discover modules inside the src/ directory
 sys.path.append(str(Path(__file__).resolve().parent.parent))

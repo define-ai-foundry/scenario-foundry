@@ -26,7 +26,8 @@ dependencies = [
 # This turns your scripts into system-wide command line tools.
 [project.scripts]
 generate-scenario = "scenario_foundry.generate_scenario:main"
-generate-sensor-data = "scenario_foundry.generate_sensor_data:main"
+generate-sensor-data = "scenario_foundry.generation.generate_sensor_data:main"
+optimize-vectors = "scenario_foundry.generation.optimize_vectors:main"
 export-scenario = "scenario_foundry.export_scenario:main"
 
 # This is the magic that fixes your ModuleNotFoundError. 
