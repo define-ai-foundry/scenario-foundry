@@ -178,3 +178,37 @@ Once exported, you can visualize your tactical layers on Google My Maps or stand
 | `flight_vectors_layer.csv` | WKT (Well-Known Text) | `Vector_ID` | Group styles by classification (solid lines). |
 | `sensor_network_layer.csv` | Latitude, Longitude | `Sensor_Node_ID` | Blue Radar/Shield icons showing sensor nodes. |
 | `sensor_detections_layer.csv` | Latitude, Longitude | `Track_ID` | Small point clusters grouped by Tracking State. |
+
+## Development
+
+Install the project together with the development tooling (Ruff, pytest, pytest-cov):
+
+```bash
+pip install -e ".[dev]"
+```
+
+### Linting
+
+Linting and formatting use [Ruff](https://docs.astral.sh/ruff/). Its configuration lives in `pyproject.toml`:
+
+```bash
+ruff check .           # report lint issues
+ruff format --check .  # report formatting issues
+
+ruff check --fix .     # auto-fix lint issues
+ruff format .          # apply formatting
+```
+
+### Testing
+
+Tests use `pytest` with branch coverage via `pytest-cov`. The coverage settings and the 95% minimum gate are configured in `pyproject.toml`, so a plain invocation runs the full suite and prints a coverage report:
+
+```bash
+pytest
+```
+
+The run fails if coverage drops below the configured threshold.
+
+### Continuous Integration
+
+All of the above run automatically on GitHub Actions (`.github/workflows/ci.yml`) for every push to `main`/`master` and every pull request: Ruff lint, Ruff format check, and the test suite with the coverage gate.
