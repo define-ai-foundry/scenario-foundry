@@ -1,13 +1,14 @@
 # Copyright 2026 Lempea Edge Oy / DEFINE AI Foundry
 # SPDX-License-Identifier: Apache-2.0
 
+import argparse
+import csv
 import json
 import os
-import sys
 import re
-import csv
-import argparse
+import sys
 from pathlib import Path
+
 from scenario_foundry import config
 
 # Ensure Python can discover modules inside the src/ directory
@@ -28,18 +29,18 @@ def decimate_wkt_linestring(wkt_str, sample_rate=10):
     match = re.search(r'LINESTRING\s*\((.*)\)', wkt_str, re.IGNORECASE)
     if not match:
         return wkt_str.strip().upper()
-        
+
     raw_coords = match.group(1).split(',')
     clean_coords = [c.strip() for c in raw_coords if c.strip()]
-    
+
     if len(clean_coords) <= 2:
         return wkt_str.strip().upper()
-        
+
     decimated_list = []
     for idx, coord in enumerate(clean_coords):
         if idx == 0 or idx == len(clean_coords) - 1 or (idx % sample_rate == 0):
             decimated_list.append(coord)
-            
+
     return f"LINESTRING ({', '.join(decimated_list)})"
 
 # --- LAYER EXPORTERS ---
@@ -47,9 +48,9 @@ def export_targets(tactical_data, output_dir):
     """Generates the static target infrastructure layer."""
     output_path = os.path.join(output_dir, "targets_layer.csv")
     targets = tactical_data.get("targets", {})
-    
+
     headers = ["Target_Name", "Latitude", "Longitude", "Base_Elevation_M"]
-    
+
     with open(output_path, 'w', newline='', encoding='utf-8-sig') as f:
         writer = csv.writer(f)
         writer.writerow(headers)
@@ -66,16 +67,16 @@ def export_flight_vectors(tactical_data, output_dir, sample_rate):
     """Generates the continuous flight path vector layer using unquoted headers for Google Maps WKT validation."""
     output_path = os.path.join(output_dir, "flight_vectors_layer.csv")
     threat_profiles = tactical_data.get("threat_profiles", {})
-    
+
     with open(output_path, 'w', newline='', encoding='utf-8-sig') as f:
         f.write("Vector_ID,Classification,Target,Speed_KMH,Planned_Altitude_M,WKT\n")
-        
+
         writer = csv.writer(f, lineterminator='\n', quoting=csv.QUOTE_ALL)
         for profile_id, profile in threat_profiles.items():
             wkt_string = profile.get("wkt_linestring", "")
             if not wkt_string:
                 continue
-                
+
             compact_wkt = decimate_wkt_linestring(wkt_string, sample_rate=sample_rate)
             writer.writerow([
                 profile_id,
@@ -91,9 +92,9 @@ def export_sensor_network(tactical_data, output_dir):
     """Generates the defensive sensor node location layer."""
     output_path = os.path.join(output_dir, "sensor_network_layer.csv")
     sensors = tactical_data.get("sensor_network", [])
-    
+
     headers = ["Sensor_Node_ID", "Sensor_Type", "Latitude", "Longitude", "Coverage_Range_M", "Update_Rate_Sec"]
-    
+
     with open(output_path, 'w', newline='', encoding='utf-8-sig') as f:
         writer = csv.writer(f)
         writer.writerow(headers)
@@ -268,11 +269,11 @@ def main():
     parser.add_argument("--location", default=None, help="Optional location name for resolving input paths (e.g., 'joensuu')")
     parser.add_argument("--outdir", default=OUTPUT_DIR, help="Output directory for generated GIS layers")
     parser.add_argument("--sample-rate", type=int, default=10, help="Downsampling rate step index for dense WKT strings")
-    
+
     args = parser.parse_args()
     os.makedirs(args.outdir, exist_ok=True)
 
-    # Resolve input paths for scenario and messages using the provided arguments and resolution logic  
+    # Resolve input paths for scenario and messages using the provided arguments and resolution logic
     args.scenario = resolve_input(
     args.scenario,
     TACTICAL_DIR,
@@ -299,14 +300,14 @@ def main():
 
     # Load the tactical environment profile and the simulated SAPIENT message stream
     try:
-        with open(args.scenario, 'r', encoding='utf-8') as f:
+        with open(args.scenario, encoding='utf-8') as f:
             tactical_data = json.load(f)
     except Exception as e:
         print(f"[CRITICAL] Error parsing tactical environment profile: {e}")
         return
 
     try:
-        with open(args.messages, 'r', encoding='utf-8') as f:
+        with open(args.messages, encoding='utf-8') as f:
             messages_data = json.load(f)
     except Exception as e:
         print(f"[CRITICAL] Error parsing simulation streams: {e}")

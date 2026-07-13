@@ -4,20 +4,22 @@
 import argparse
 import sys
 from pathlib import Path
+
 from scenario_foundry import config
 
 # Ensure Python can discover modules inside the src/ directory
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from scenario_foundry.generation.fetch_terrain import main as run_fetch_terrain
-from scenario_foundry.generation.optimize_vectors import main as run_optimize_vectors
 from scenario_foundry.generation.generate_sensor_data import main as run_generate_sensor_data
-    
+from scenario_foundry.generation.optimize_vectors import main as run_optimize_vectors
+
+
 def main():
     parser = argparse.ArgumentParser(description="SAPIENT Generation Pipeline Orchestrator")
     parser.add_argument(
-        "--scenario", 
-        required=True, 
+        "--scenario",
+        required=True,
         help="Name of the scenario file inside config/scenarios/ (e.g., joensuu.json or just joensuu)"
     )
     args = parser.parse_args()
@@ -51,8 +53,8 @@ def main():
     print("\n[STEP 2/3] Optimizing threat flight vectors using terrain data...")
     tactical_scenario_path = config.TACTICAL_DIR / f"{scenario_name}_tactical.json"
     sys.argv = [
-        "optimize_vectors.py", 
-        "--scenario", str(coarse_scenario_path), 
+        "optimize_vectors.py",
+        "--scenario", str(coarse_scenario_path),
         "--output", str(tactical_scenario_path)
     ]
     try:
@@ -65,8 +67,8 @@ def main():
     print("\n[STEP 3/3] Generating synchronized SAPIENT sensor data stream...")
     generated_output_path = config.GENERATED_DIR / f"{scenario_name}_messages.json"
     sys.argv = [
-        "generate_sensor_data.py", 
-        "--scenario", str(tactical_scenario_path), 
+        "generate_sensor_data.py",
+        "--scenario", str(tactical_scenario_path),
         "--output", str(generated_output_path)
     ]
     try:

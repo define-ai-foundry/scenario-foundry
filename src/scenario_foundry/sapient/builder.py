@@ -1,7 +1,6 @@
 # Copyright 2026 Lempea Edge Oy / DEFINE AI Foundry
 # SPDX-License-Identifier: Apache-2.0
 
-from sapient_msg.bsi_flex_335_v2_0 import location_pb2
 
 
 SAP_COORD_LAT_LNG_DEG_M = (

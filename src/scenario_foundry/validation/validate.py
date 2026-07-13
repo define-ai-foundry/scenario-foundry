@@ -13,14 +13,15 @@ Validates:
 - sensor network definitions
 """
 
+import argparse
+import datetime
 import json
 import pathlib
-import datetime
-import argparse
-from scenario_foundry import config
 
-from jsonschema import validate, ValidationError
+from jsonschema import ValidationError, validate
 from shapely import wkt
+
+from scenario_foundry import config
 
 
 class ScenarioValidationError(Exception):
@@ -28,7 +29,7 @@ class ScenarioValidationError(Exception):
 
 
 def load_json(path: str | pathlib.Path):
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -43,7 +44,7 @@ def validate_schema(config: dict, schema_path: str | pathlib.Path):
     except ValidationError as e:
         raise ScenarioValidationError(
             f"Schema validation failed: {e.message}"
-        )
+        ) from e
 
 
 def validate_coordinates(lat, lon, context="coordinate"):
@@ -66,10 +67,10 @@ def validate_scenario_meta(meta):
             meta["start_time_iso"].replace("Z", "+00:00")
         )
 
-    except ValueError:
+    except ValueError as e:
         raise ScenarioValidationError(
             "Invalid start_time_iso format"
-        )
+        ) from e
 
     duration = meta["duration_seconds"]
     timestep = meta["time_step_seconds"]
@@ -120,10 +121,10 @@ def validate_threat_profiles(threats):
                 threat["wkt_linestring"]
             )
 
-        except Exception:
+        except Exception as e:
             raise ScenarioValidationError(
                 f"{name}: invalid WKT LineString"
-            )
+            ) from e
 
         if geometry.geom_type != "LineString":
             raise ScenarioValidationError(
