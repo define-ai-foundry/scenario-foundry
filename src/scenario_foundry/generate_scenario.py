@@ -20,7 +20,7 @@ def main():
     parser.add_argument(
         "--scenario",
         required=True,
-        help="Name of the scenario file inside config/scenarios/ (e.g., joensuu.json or just joensuu)"
+        help="Name of the scenario file inside config/scenarios/ (e.g., joensuu.json or just joensuu)",
     )
     args = parser.parse_args()
 
@@ -54,8 +54,10 @@ def main():
     tactical_scenario_path = config.TACTICAL_DIR / f"{scenario_name}_tactical.json"
     sys.argv = [
         "optimize_vectors.py",
-        "--scenario", str(coarse_scenario_path),
-        "--output", str(tactical_scenario_path)
+        "--scenario",
+        str(coarse_scenario_path),
+        "--output",
+        str(tactical_scenario_path),
     ]
     try:
         run_optimize_vectors()
@@ -68,8 +70,10 @@ def main():
     generated_output_path = config.GENERATED_DIR / f"{scenario_name}_messages.json"
     sys.argv = [
         "generate_sensor_data.py",
-        "--scenario", str(tactical_scenario_path),
-        "--output", str(generated_output_path)
+        "--scenario",
+        str(tactical_scenario_path),
+        "--output",
+        str(generated_output_path),
     ]
     try:
         run_generate_sensor_data()
@@ -80,9 +84,12 @@ def main():
     # Execution complete
     print("\n" + "=" * 80)
     print("SAPIENT GENERATION PIPELINE COMPLETED SUCCESSFULLY!")
-    print(f"-> Refined Tactical Scenario: {tactical_scenario_path.relative_to(config.PROJECT_ROOT)}")
+    print(
+        f"-> Refined Tactical Scenario: {tactical_scenario_path.relative_to(config.PROJECT_ROOT)}"
+    )
     print(f"-> SAPIENT Log Stream (JSON): {generated_output_path.relative_to(config.PROJECT_ROOT)}")
     print("=" * 80)
+
 
 if __name__ == "__main__":
     main()

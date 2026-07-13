@@ -12,6 +12,7 @@ from scenario_foundry import config
 DEFAULT_CACHE_DIR = str(config.TERRAIN_DIR)
 GRID_CACHE = {}
 
+
 def read_elevation_from_local_asc(lat, lon, cache_dir):
     """Robust ESRI Arc ASCII Grid Matrix Reader."""
     lat_floor = math.floor(lat)
@@ -65,22 +66,25 @@ def read_elevation_from_local_asc(lat, lon, cache_dir):
     except Exception:
         return 80.0
 
+
 def parse_wkt_points(wkt_str):
     points = []
-    match = re.search(r'LINESTRING\s*\((.*)\)', wkt_str, re.IGNORECASE)
+    match = re.search(r"LINESTRING\s*\((.*)\)", wkt_str, re.IGNORECASE)
     if match:
-        for pair in match.group(1).split(','):
+        for pair in match.group(1).split(","):
             lon, lat = map(float, pair.strip().split())
             points.append((lat, lon))
     return points
+
 
 def get_distance_meters(lat1, lon1, lat2, lon2):
     R = 6371000.0
     phi1, phi2 = math.radians(lat1), math.radians(lat2)
     dphi = math.radians(lat2 - lat1)
     dlambda = math.radians(lon2 - lon1)
-    a = math.sin(dphi/2)**2 + math.cos(phi1)*math.cos(phi2)*math.sin(dlambda/2)**2
-    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
+    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
 
 def optimize_track(coarse_waypoints, cache_dir):
     """
@@ -97,7 +101,7 @@ def optimize_track(coarse_waypoints, cache_dir):
 
     for i in range(len(coarse_waypoints) - 1):
         start_lat, start_lon = coarse_waypoints[i]
-        leg_target_lat, leg_target_lon = coarse_waypoints[i+1]
+        leg_target_lat, leg_target_lon = coarse_waypoints[i + 1]
 
         current_lat, current_lon = start_lat, start_lon
         if i == 0:
@@ -109,13 +113,19 @@ def optimize_track(coarse_waypoints, cache_dir):
         while iterations < max_iterations:
             iterations += 1
 
-            dist_to_target = get_distance_meters(current_lat, current_lon, leg_target_lat, leg_target_lon)
+            dist_to_target = get_distance_meters(
+                current_lat, current_lon, leg_target_lat, leg_target_lon
+            )
             if dist_to_target <= step_size_meters * 1.2:
                 break
 
             d_lon = math.radians(leg_target_lon - current_lon)
             y = math.sin(d_lon) * math.cos(math.radians(leg_target_lat))
-            x = math.cos(math.radians(current_lat))*math.sin(math.radians(leg_target_lat)) - math.sin(math.radians(current_lat))*math.cos(math.radians(leg_target_lat))*math.cos(d_lon)
+            x = math.cos(math.radians(current_lat)) * math.sin(
+                math.radians(leg_target_lat)
+            ) - math.sin(math.radians(current_lat)) * math.cos(
+                math.radians(leg_target_lat)
+            ) * math.cos(d_lon)
             target_heading = math.atan2(y, x)
 
             att_x = math.cos(target_heading)
@@ -129,7 +139,9 @@ def optimize_track(coarse_waypoints, cache_dir):
             for angle_deg in range(0, 360, 45):
                 angle_rad = math.radians(angle_deg)
                 scan_lat = current_lat + math.degrees(scan_rad * math.cos(angle_rad))
-                scan_lon = current_lon + math.degrees(scan_rad * math.sin(angle_rad) / math.cos(math.radians(current_lat)))
+                scan_lon = current_lon + math.degrees(
+                    scan_rad * math.sin(angle_rad) / math.cos(math.radians(current_lat))
+                )
 
                 h_scan = read_elevation_from_local_asc(scan_lat, scan_lon, cache_dir)
 
@@ -157,13 +169,16 @@ def optimize_track(coarse_waypoints, cache_dir):
 
             step_dist = step_size_meters / R
             current_lat += math.degrees(step_dist * math.cos(final_heading))
-            current_lon += math.degrees(step_dist * math.sin(final_heading) / math.cos(math.radians(current_lat)))
+            current_lon += math.degrees(
+                step_dist * math.sin(final_heading) / math.cos(math.radians(current_lat))
+            )
 
             optimized_points.append((current_lat, current_lon))
 
         optimized_points.append((leg_target_lat, leg_target_lon))
 
     return optimized_points
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -176,7 +191,7 @@ def main():
         base, ext = os.path.splitext(args.scenario)
         args.output = f"{base}_tactical{ext}"
 
-    with open(args.scenario, encoding='utf-8') as f:
+    with open(args.scenario, encoding="utf-8") as f:
         scenario = json.load(f)
 
     meta = scenario.get("scenario_meta", {})
@@ -189,17 +204,19 @@ def main():
 
     for wave_id, wave in scenario.get("threat_profiles", {}).items():
         coarse_wkt = wave.get("wkt_linestring", "")
-        if not coarse_wkt: continue
+        if not coarse_wkt:
+            continue
         coarse_pts = parse_wkt_points(coarse_wkt)
         print(f"  -> Processing wave: {wave_id}...")
         tactical_pts = optimize_track(coarse_pts, args.cache)
         wkt_strings = [f"{lon:.6f} {lat:.6f}" for lat, lon in tactical_pts]
         wave["wkt_linestring"] = f"LINESTRING ({', '.join(wkt_strings)})"
 
-    with open(args.output, 'w', encoding='utf-8') as f:
+    with open(args.output, "w", encoding="utf-8") as f:
         json.dump(scenario, f, indent=2)
     print("-" * 70)
     print(f"SUCCESS: Tactical scenario manifest compiled -> {args.output}")
+
 
 if __name__ == "__main__":
     main()

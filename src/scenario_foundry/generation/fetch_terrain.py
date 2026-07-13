@@ -13,14 +13,16 @@ from scenario_foundry import config
 
 DEFAULT_CACHE_DIR = str(config.TERRAIN_DIR)
 
+
 def parse_wkt_points(wkt_str):
     points = []
-    line_match = re.search(r'LINESTRING\s*\((.*)\)', wkt_str, re.IGNORECASE)
+    line_match = re.search(r"LINESTRING\s*\((.*)\)", wkt_str, re.IGNORECASE)
     if line_match:
-        for pair in line_match.group(1).split(','):
+        for pair in line_match.group(1).split(","):
             lon, lat = map(float, pair.strip().split())
             points.append((lat, lon))
     return points
+
 
 def extract_required_tiles(scenario_data):
     tiles = set()
@@ -34,6 +36,7 @@ def extract_required_tiles(scenario_data):
         lon_pfx = f"E{lon_floor:03d}" if lon_floor >= 0 else f"W{abs(lon_floor):03d}"
         tiles.add((lat_floor, lon_floor, f"{lat_pfx}{lon_pfx}"))
     return sorted(tiles, key=lambda x: x[2])
+
 
 def fetch_tile_from_opentopography(lat_min, lon_min, tile_name, cache_dir, api_key):
     lat_max = lat_min + 1.0
@@ -52,7 +55,7 @@ def fetch_tile_from_opentopography(lat_min, lon_min, tile_name, cache_dir, api_k
     print(f"  [API GATEWAY] Fetching plaintext AAIGrid dataset for tile: {tile_name}")
     try:
         ssl_context = ssl.create_default_context()
-        req = urllib.request.Request(url, headers={'User-Agent': 'SAPIENT-Generation-Engine'})  # noqa: S310
+        req = urllib.request.Request(url, headers={"User-Agent": "SAPIENT-Generation-Engine"})  # noqa: S310
         with urllib.request.urlopen(req, timeout=65, context=ssl_context) as response:  # noqa: S310
             raw_data = response.read()
             if b"Error" in raw_data[:100] or len(raw_data) < 2000:
@@ -61,11 +64,14 @@ def fetch_tile_from_opentopography(lat_min, lon_min, tile_name, cache_dir, api_k
             target_path = os.path.join(cache_dir, f"{tile_name}.asc")
             with open(target_path, "wb") as f:
                 f.write(raw_data)
-            print(f"  [SUCCESS] Staged plaintext grid node -> {tile_name}.asc ({len(raw_data)/(1024*1024):.2f} MB)")
+            print(
+                f"  [SUCCESS] Staged plaintext grid node -> {tile_name}.asc ({len(raw_data) / (1024 * 1024):.2f} MB)"
+            )
             return True
     except Exception as e:
         print(f"  [FAIL] Payload transfer error: {e}")
         return False
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -74,13 +80,15 @@ def main():
     parser.add_argument("--api-key", default="")
     args = parser.parse_args()
 
-    with open(args.scenario, encoding='utf-8') as f:
+    with open(args.scenario, encoding="utf-8") as f:
         scenario = json.load(f)
 
     api_key = args.api_key if args.api_key else config.OPENTOPOGRAPHY_API_KEY
 
     if not api_key:
-        print("Error: OpenTopography API key is required. Provide it via --api-key or set OPENTOPOGRAPHY_API_KEY in .env")
+        print(
+            "Error: OpenTopography API key is required. Provide it via --api-key or set OPENTOPOGRAPHY_API_KEY in .env"
+        )
         return
 
     required_tiles = extract_required_tiles(scenario)
@@ -93,6 +101,7 @@ def main():
             continue
 
         fetch_tile_from_opentopography(lat_min, lon_min, tile_name, args.cache, api_key)
+
 
 if __name__ == "__main__":
     main()
