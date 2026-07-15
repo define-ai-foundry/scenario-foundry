@@ -158,6 +158,31 @@
           }
         }
       }
+    },
+
+    "detection_thresholds": {
+      "type": "object",
+      "description": "Optional overrides for detection thresholds; omitted keys fall back to code defaults",
+      "properties": {
+        "radar_swarm_indicator_switch_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "thermal_cam_max_range_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "visual_cam_max_range_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "radar_strategic_min_altitude_m": {
+          "type": "number"
+        },
+        "civil_twilight_elevation_deg": {
+          "type": "number"
+        }
+      }
     }
 
   },

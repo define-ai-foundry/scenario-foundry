@@ -316,13 +316,50 @@ def _full_scenario(start_time):
     }
 
 
-def _run_main(tmp_path, start_time, monkeypatch):
+def _run_main(tmp_path, start_time, monkeypatch, *, mutate=None):
+    scenario = _full_scenario(start_time)
+    if mutate is not None:
+        mutate(scenario)
     scen = tmp_path / "scen.json"
-    scen.write_text(json.dumps(_full_scenario(start_time)), encoding="utf-8")
+    scen.write_text(json.dumps(scenario), encoding="utf-8")
     out = tmp_path / "out.json"
     monkeypatch.setattr("sys.argv", ["g", "--scenario", str(scen), "--output", str(out)])
     g.main()
     return json.loads(out.read_text(encoding="utf-8"))
+
+
+def _tactical_radar_object_ids(msgs):
+    # Object ids for the TA_TAC wave, which sits right next to RAD-TAC-2 (a
+    # near detection, so it straddles the swarm/indicator switch distance).
+    return [
+        oid
+        for m in msgs
+        if m["sapientMessage"]["header"]["sourceNode"]["nodeId"] == "RAD-TAC-2"
+        and "TA_TAC" in (oid := m["sapientMessage"]["detectionReport"].get("objectId", ""))
+    ]
+
+
+def test_radar_switch_threshold_is_configurable(tmp_path, monkeypatch):
+    # Default 8000 m switch: the nearby wave reports as indicators.
+    default_ids = _tactical_radar_object_ids(
+        _run_main(tmp_path, "2026-11-15T02:45:00Z", monkeypatch)
+    )
+    assert default_ids
+    assert all("-IND-" in oid for oid in default_ids)
+
+    # Lowering the switch flips the same detections to the swarm branch.
+    lowered_ids = _tactical_radar_object_ids(
+        _run_main(
+            tmp_path,
+            "2026-11-15T02:45:00Z",
+            monkeypatch,
+            mutate=lambda s: s.update(
+                {"detection_thresholds": {"radar_swarm_indicator_switch_m": 10}}
+            ),
+        )
+    )
+    assert lowered_ids
+    assert all("-SWM-" in oid for oid in lowered_ids)
 
 
 def _optical_statuses(msgs):

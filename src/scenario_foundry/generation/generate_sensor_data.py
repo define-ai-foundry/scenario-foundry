@@ -13,14 +13,14 @@ from datetime import datetime, timedelta
 from google.protobuf import json_format
 
 from sapient_msg.bsi_flex_335_v2_0 import detection_report_pb2
-from scenario_foundry import config
+from scenario_foundry import config, constants
 from scenario_foundry.rng import seed_all
 from scenario_foundry.sapient.builder import make_location, make_range_bearing, make_velocity
 
 
 # --- GEOSPATIAL & CELESTIAL MATH LIBRARY ---
 def haversine_dist(lat1, lon1, lat2, lon2):
-    R = 6371000
+    R = constants.EARTH_RADIUS_M
     p1, p2 = math.radians(lat1), math.radians(lat2)
     dp, dl = math.radians(lat2 - lat1), math.radians(lon2 - lon1)
     a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
@@ -35,7 +35,7 @@ def calc_bearing(lat1, lon1, lat2, lon2):
 
 
 def add_metric_noise_to_wgs84(lat, lon, error_north_m, error_east_m):
-    R = 6371000.0
+    R = constants.EARTH_RADIUS_M
     delta_lat = (error_north_m / R) * (180.0 / math.pi)
     delta_lon = (error_east_m / (R * math.cos(math.radians(lat)))) * (180.0 / math.pi)
     return lat + delta_lat, lon + delta_lon
@@ -62,8 +62,8 @@ def make_wgs84_location(lat, lon, alt):
         "x": round(lon, 6),
         "y": round(lat, 6),
         "z": round(alt, 1),
-        "coordinateSystem": "LOCATION_COORDINATE_SYSTEM_LAT_LNG_DEG_M",
-        "datum": "LOCATION_DATUM_WGS84_E",
+        "coordinateSystem": constants.SAP_COORD_LAT_LNG_DEG_M,
+        "datum": constants.SAP_DATUM_WGS84,
     }
 
 
@@ -119,7 +119,7 @@ def read_elevation_from_local_asc(lat, lon, cache_dir=str(config.TERRAIN_DIR)):
 
     try:
         val = mat[row][col]
-        return val if val > -500 else None
+        return val if val > constants.ELEVATION_NODATA_THRESHOLD_M else None
     except Exception:
         return None
 
@@ -131,7 +131,7 @@ def get_terrain_elevation(lat, lon, scenario_config):
 
     anchors = scenario_config.get("terrain_elevation_anchors", [])
     if not anchors:
-        return 80.0
+        return constants.DEFAULT_TERRAIN_ELEVATION_M
     total_weight, weighted_elevation = 0.0, 0.0
     for anchor in anchors:
         dist = max(haversine_dist(lat, lon, anchor["lat"], anchor["lon"]), 1.0)
@@ -170,11 +170,11 @@ def get_position(waypoints, distance_traveled):
 def calculate_dynamic_confidence(dist, max_range, sensor_type):
     proximity_ratio = max(0.0, min(1.0, 1.0 - (dist / max_range)))
     scintillation = random.uniform(-0.03, 0.03)
-    if "RADAR" in sensor_type:
+    if constants.SensorType.is_radar(sensor_type):
         base_conf = 0.45 + (0.50 * proximity_ratio)
-    elif sensor_type in ["THERMAL_CAM", "VISUAL_CAM"]:
+    elif sensor_type in [constants.SensorType.THERMAL_CAM, constants.SensorType.VISUAL_CAM]:
         base_conf = 0.30 + (0.68 * (proximity_ratio**2))
-    elif sensor_type == "ACOUSTIC":
+    elif sensor_type == constants.SensorType.ACOUSTIC:
         base_conf = 0.35 + (0.50 * proximity_ratio)
     else:
         base_conf = 0.50 + (0.45 * proximity_ratio)
@@ -211,6 +211,7 @@ def main():
         scenario = json.load(f)
 
     meta = scenario["scenario_meta"]
+    thresholds = constants.resolve_detection_thresholds(scenario)
     start_dt = datetime.fromisoformat(meta["start_time_iso"].replace("Z", ""))
     duration = meta["duration_seconds"]
 
@@ -253,34 +254,40 @@ def main():
 
                 ground_height_msl = get_terrain_elevation(lat, lon, scenario)
                 current_agl = wave["alt_m"]
-                if is_final_leg and wave["classification"] != "UAV_Decoy":
+                if is_final_leg and wave["classification"] != constants.CLASSIFICATION_DECOY:
                     current_agl = wave["alt_m"] * (1.0 - ratio)
 
                 absolute_altitude_msl = ground_height_msl + current_agl
-                if sens["type"] == "RADAR_STRATEGIC" and absolute_altitude_msl < 100:
+                if (
+                    sens["type"] == constants.SensorType.RADAR_STRATEGIC
+                    and absolute_altitude_msl < thresholds["radar_strategic_min_altitude_m"]
+                ):
                     continue
 
                 noisy_lat, noisy_lon = lat, lon
-                if "RADAR" in sens["type"]:
+                if constants.SensorType.is_radar(sens["type"]):
                     sigma_meters = 5.0 + (30.0 * (dist / sens["range_m"]))
                     noisy_lat, noisy_lon = add_metric_noise_to_wgs84(
                         lat, lon, random.gauss(0, sigma_meters), random.gauss(0, sigma_meters)
                     )
-                elif sens["type"] in ["THERMAL_CAM", "VISUAL_CAM"]:
+                elif sens["type"] in [
+                    constants.SensorType.THERMAL_CAM,
+                    constants.SensorType.VISUAL_CAM,
+                ]:
                     sigma_meters = 2.0 + (15.0 * ((dist / sens["range_m"]) ** 2))
                     noisy_lat, noisy_lon = add_metric_noise_to_wgs84(
                         lat, lon, random.gauss(0, sigma_meters), random.gauss(0, sigma_meters)
                     )
-                elif sens["type"] == "MICRO_DOPPLER":
+                elif sens["type"] == constants.SensorType.MICRO_DOPPLER:
                     sigma_m = random.gauss(0, 1.5)
                     noisy_lat, noisy_lon = add_metric_noise_to_wgs84(lat, lon, sigma_m, sigma_m)
 
                 calculated_conf = calculate_dynamic_confidence(dist, sens["range_m"], sens["type"])
-                if sens["type"] == "VISUAL_CAM":
+                if sens["type"] == constants.SensorType.VISUAL_CAM:
                     solar_elevation = calculate_solar_elevation(
                         sens["lat"], sens["lon"], current_sim_time
                     )
-                    if solar_elevation <= -6.0:
+                    if solar_elevation <= thresholds["civil_twilight_elevation_deg"]:
                         calculated_conf = 0.12
 
                 # -------------------------------------------------------------
@@ -289,7 +296,7 @@ def main():
 
                 # 1. Build the Complex Detection Report Dictionary
                 rep_dict = {
-                    "state": "ACTIVE",
+                    "state": constants.DETECTION_STATE_ACTIVE,
                     "classification": [
                         {"type": wave["classification"].upper(), "confidence": calculated_conf}
                     ],
@@ -297,23 +304,32 @@ def main():
 
                 pfx = wave_id[:2]
                 s_code = f"A-0{sens['id'][-1:] if sens['id'][-1:].isdigit() else '1'}"
-                is_diving = is_final_leg and wave["classification"] != "UAV_Decoy"
+                is_diving = (
+                    is_final_leg and wave["classification"] != constants.CLASSIFICATION_DECOY
+                )
 
                 # We hold custom simulation attributes here to bypass strict core validation
                 extra_attributes = {}
 
                 # 2. Append Sensor Payloads directly to rep_dict.
                 # EVERY location block MUST USE WGS84_STR dynamically.
-                if "RADAR" in sens["type"] and dist > 8000:
+                switch_m = thresholds["radar_swarm_indicator_switch_m"]
+                if constants.SensorType.is_radar(sens["type"]) and dist > switch_m:
                     rep_dict["objectId"] = f"{s_code}-SWM-{pfx}_{wave['id_suffix']}"
                     rep_dict["location"] = make_location(
                         noisy_lat, noisy_lon, absolute_altitude_msl
                     )
                     extra_attributes["measuredAttributes"] = {"estimatedSwarmCount": wave["count"]}
                     if is_diving:
-                        extra_attributes["measuredAttributes"]["tacticalState"] = "TERMINAL_DIVE"
+                        extra_attributes["measuredAttributes"]["tacticalState"] = (
+                            constants.TACTICAL_STATE_TERMINAL_DIVE
+                        )
 
-                elif sens["type"] in ["MICRO_DOPPLER", "RADAR_TACTICAL"] and dist <= 8000:
+                elif (
+                    sens["type"]
+                    in [constants.SensorType.MICRO_DOPPLER, constants.SensorType.RADAR_TACTICAL]
+                    and dist <= switch_m
+                ):
                     rep_dict["objectId"] = (
                         f"{s_code}-IND-{pfx}_{wave['id_suffix']}_0{wave['count'] - 2}"
                     )
@@ -327,16 +343,18 @@ def main():
 
                     rep_dict["enuVelocity"] = make_velocity(east, north, v_up)
 
-                    if sens["type"] == "MICRO_DOPPLER":
+                    if sens["type"] == constants.SensorType.MICRO_DOPPLER:
                         extra_attributes["measuredAttributes"] = {
-                            "microDopplerRotorSpeedRps": 220.0
-                            if "FPV" in wave["classification"]
-                            else 75.0
+                            "microDopplerRotorSpeedRps": constants.ROTOR_SPEED_FPV_RPS
+                            if constants.CLASSIFICATION_FPV_MARKER in wave["classification"]
+                            else constants.ROTOR_SPEED_DEFAULT_RPS
                         }
                         if is_diving:
-                            extra_attributes["measuredAttributes"]["maneuverState"] = "HIGH_G_DIVE"
+                            extra_attributes["measuredAttributes"]["maneuverState"] = (
+                                constants.MANEUVER_STATE_HIGH_G_DIVE
+                            )
 
-                elif sens["type"] == "ACOUSTIC":
+                elif sens["type"] == constants.SensorType.ACOUSTIC:
                     rep_dict["objectId"] = f"ACU-{s_code}_{pfx}_{wave['id_suffix']}"
                     noisy_bearing = (
                         calc_bearing(sens["lat"], sens["lon"], lat, lon) + random.gauss(0, 3.5)
@@ -344,18 +362,24 @@ def main():
 
                     rep_dict["rangeBearing"] = make_range_bearing(noisy_bearing, dist)
 
-                elif sens["type"] == "THERMAL_CAM" and dist <= 4000:
+                elif (
+                    sens["type"] == constants.SensorType.THERMAL_CAM
+                    and dist <= thresholds["thermal_cam_max_range_m"]
+                ):
                     rep_dict["objectId"] = f"CAM-{s_code}_{pfx}_{wave['id_suffix']}"
                     rep_dict["location"] = make_location(
                         noisy_lat, noisy_lon, absolute_altitude_msl
                     )
                     extra_attributes["opticalAttributes"] = {
-                        "spectrumChannel": "LWIR_THERMAL",
-                        "visualConfirmation": "POSITIVE",
-                        "targetThermalIntensity": "HIGH",
+                        "spectrumChannel": constants.SPECTRUM_LWIR_THERMAL,
+                        "visualConfirmation": constants.VISUAL_CONFIRMATION_POSITIVE,
+                        "targetThermalIntensity": constants.THERMAL_INTENSITY_HIGH,
                     }
 
-                elif sens["type"] == "VISUAL_CAM" and dist <= 3000:
+                elif (
+                    sens["type"] == constants.SensorType.VISUAL_CAM
+                    and dist <= thresholds["visual_cam_max_range_m"]
+                ):
                     solar_elevation = calculate_solar_elevation(
                         sens["lat"], sens["lon"], current_sim_time
                     )
@@ -363,17 +387,17 @@ def main():
                     rep_dict["location"] = make_location(
                         noisy_lat, noisy_lon, absolute_altitude_msl
                     )
-                    if solar_elevation > -6.0:
+                    if solar_elevation > thresholds["civil_twilight_elevation_deg"]:
                         extra_attributes["opticalAttributes"] = {
-                            "spectrumChannel": "VISIBLE_COLOR",
-                            "visualConfirmation": "POSITIVE",
-                            "illuminationStatus": "OPTIMAL",
+                            "spectrumChannel": constants.SPECTRUM_VISIBLE_COLOR,
+                            "visualConfirmation": constants.VISUAL_CONFIRMATION_POSITIVE,
+                            "illuminationStatus": constants.ILLUMINATION_OPTIMAL,
                         }
                     else:
                         extra_attributes["opticalAttributes"] = {
-                            "spectrumChannel": "VISIBLE_COLOR",
-                            "visualConfirmation": "UNCONFIRMED",
-                            "illuminationStatus": "POOR_BLIND",
+                            "spectrumChannel": constants.SPECTRUM_VISIBLE_COLOR,
+                            "visualConfirmation": constants.VISUAL_CONFIRMATION_UNCONFIRMED,
+                            "illuminationStatus": constants.ILLUMINATION_POOR_BLIND,
                         }
 
                 # 3. The Modular Validation Sandbox
@@ -395,9 +419,12 @@ def main():
                         {
                             "sapientMessage": {
                                 "header": {
-                                    "icdVersion": "2.0",
+                                    "icdVersion": constants.ICD_VERSION,
                                     "timestamp": ts_str,
-                                    "sourceNode": {"nodeId": str(sens["id"]), "type": "CHILD"},
+                                    "sourceNode": {
+                                        "nodeId": str(sens["id"]),
+                                        "type": constants.NODE_TYPE_CHILD,
+                                    },
                                 },
                                 "detectionReport": valid_rep,
                             }

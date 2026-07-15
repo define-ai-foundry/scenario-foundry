@@ -7,7 +7,7 @@ import math
 import os
 import re
 
-from scenario_foundry import config
+from scenario_foundry import config, constants
 from scenario_foundry.rng import seed_all
 
 DEFAULT_CACHE_DIR = str(config.TERRAIN_DIR)
@@ -24,7 +24,7 @@ def read_elevation_from_local_asc(lat, lon, cache_dir):
     asc_path = os.path.join(cache_dir, f"{asc_name}.asc")
 
     if not os.path.exists(asc_path):
-        return 80.0
+        return constants.DEFAULT_TERRAIN_ELEVATION_M
 
     if asc_name not in GRID_CACHE:
         try:
@@ -41,11 +41,11 @@ def read_elevation_from_local_asc(lat, lon, cache_dir):
 
                 GRID_CACHE[asc_name] = {"header": header, "matrix": matrix}
         except Exception:
-            return 80.0
+            return constants.DEFAULT_TERRAIN_ELEVATION_M
 
     data = GRID_CACHE.get(asc_name)
     if not data:
-        return 80.0
+        return constants.DEFAULT_TERRAIN_ELEVATION_M
 
     hdr = data["header"]
     mat = data["matrix"]
@@ -63,9 +63,13 @@ def read_elevation_from_local_asc(lat, lon, cache_dir):
 
     try:
         val = mat[row][col]
-        return val if val > -500 else 80.0
+        return (
+            val
+            if val > constants.ELEVATION_NODATA_THRESHOLD_M
+            else constants.DEFAULT_TERRAIN_ELEVATION_M
+        )
     except Exception:
-        return 80.0
+        return constants.DEFAULT_TERRAIN_ELEVATION_M
 
 
 def parse_wkt_points(wkt_str):
@@ -79,7 +83,7 @@ def parse_wkt_points(wkt_str):
 
 
 def get_distance_meters(lat1, lon1, lat2, lon2):
-    R = 6371000.0
+    R = constants.EARTH_RADIUS_M
     phi1, phi2 = math.radians(lat1), math.radians(lat2)
     dphi = math.radians(lat2 - lat1)
     dlambda = math.radians(lon2 - lon1)
@@ -98,7 +102,7 @@ def optimize_track(coarse_waypoints, cache_dir):
 
     optimized_points = []
     step_size_meters = 60.0
-    R = 6371000.0
+    R = constants.EARTH_RADIUS_M
 
     for i in range(len(coarse_waypoints) - 1):
         start_lat, start_lon = coarse_waypoints[i]
