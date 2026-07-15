@@ -155,3 +155,26 @@ def test_main_explicit_output(tmp_path, monkeypatch):
     )
     ov.main()
     assert out.exists()
+
+
+def test_main_seed_forwarded_to_seed_all(tmp_path, monkeypatch):
+    scen = _scenario(tmp_path, {"W1": {"wkt_linestring": "LINESTRING (29.5 62.5, 29.503 62.5)"}})
+    seen = []
+    monkeypatch.setattr(ov, "seed_all", seen.append)
+    monkeypatch.setattr(
+        "sys.argv",
+        ["optimize_vectors.py", "--scenario", str(scen), "--cache", str(tmp_path), "--seed", "42"],
+    )
+    ov.main()
+    assert seen == [42]
+
+
+def test_main_without_seed_skips_seed_all(tmp_path, monkeypatch):
+    scen = _scenario(tmp_path, {"W1": {"wkt_linestring": "LINESTRING (29.5 62.5, 29.503 62.5)"}})
+    seen = []
+    monkeypatch.setattr(ov, "seed_all", seen.append)
+    monkeypatch.setattr(
+        "sys.argv", ["optimize_vectors.py", "--scenario", str(scen), "--cache", str(tmp_path)]
+    )
+    ov.main()
+    assert seen == []

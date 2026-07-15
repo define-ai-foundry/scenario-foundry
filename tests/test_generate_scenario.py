@@ -28,6 +28,42 @@ def test_main_happy_path_appends_json(monkeypatch, capsys, spies):
     assert spies == ["run_fetch_terrain", "run_optimize_vectors", "run_generate_sensor_data"]
 
 
+def test_main_forwards_seed_to_substages(monkeypatch):
+    captured = {}
+
+    def capture(name):
+        import sys
+
+        captured[name] = list(sys.argv)
+
+    monkeypatch.setattr(gs, "run_fetch_terrain", lambda: None)
+    monkeypatch.setattr(gs, "run_optimize_vectors", lambda: capture("optimize"))
+    monkeypatch.setattr(gs, "run_generate_sensor_data", lambda: capture("sensor"))
+    monkeypatch.setattr(
+        "sys.argv", ["generate_scenario.py", "--scenario", "joensuu", "--seed", "7"]
+    )
+    gs.main()
+    assert captured["optimize"][-2:] == ["--seed", "7"]
+    assert captured["sensor"][-2:] == ["--seed", "7"]
+
+
+def test_main_omits_seed_when_not_given(monkeypatch):
+    captured = {}
+
+    def capture(name):
+        import sys
+
+        captured[name] = list(sys.argv)
+
+    monkeypatch.setattr(gs, "run_fetch_terrain", lambda: None)
+    monkeypatch.setattr(gs, "run_optimize_vectors", lambda: capture("optimize"))
+    monkeypatch.setattr(gs, "run_generate_sensor_data", lambda: capture("sensor"))
+    monkeypatch.setattr("sys.argv", ["generate_scenario.py", "--scenario", "joensuu"])
+    gs.main()
+    assert "--seed" not in captured["optimize"]
+    assert "--seed" not in captured["sensor"]
+
+
 def test_main_step_raises(monkeypatch, capsys):
     def boom():
         raise RuntimeError("terrain blew up")

@@ -409,3 +409,31 @@ def test_main_proto_validation_error(tmp_path, monkeypatch, capsys):
     with pytest.raises(ValueError, match="bad proto"):
         g.main()
     assert "CRITICAL PROTOC VALIDATION ERROR" in capsys.readouterr().out
+
+
+def test_main_seed_forwarded_to_seed_all(tmp_path, monkeypatch):
+    scen = tmp_path / "scen.json"
+    scen.write_text(json.dumps(_full_scenario("2026-11-15T02:45:00Z")), encoding="utf-8")
+    out = tmp_path / "out.json"
+    seen = []
+    monkeypatch.setattr(g, "seed_all", seen.append)
+    monkeypatch.setattr(
+        "sys.argv", ["g", "--scenario", str(scen), "--output", str(out), "--seed", "42"]
+    )
+    g.main()
+    assert seen == [42]
+
+
+def test_main_same_seed_is_reproducible(tmp_path, monkeypatch):
+    scen = tmp_path / "scen.json"
+    scen.write_text(json.dumps(_full_scenario("2026-11-15T02:45:00Z")), encoding="utf-8")
+
+    def _run():
+        out = tmp_path / "out.json"
+        monkeypatch.setattr(
+            "sys.argv", ["g", "--scenario", str(scen), "--output", str(out), "--seed", "7"]
+        )
+        g.main()
+        return out.read_text(encoding="utf-8")
+
+    assert _run() == _run()
