@@ -5,6 +5,7 @@ from datetime import datetime
 
 import pytest
 
+from scenario_foundry import config, constants
 from scenario_foundry.generation import generate_sensor_data as g
 
 
@@ -474,3 +475,231 @@ def test_main_same_seed_is_reproducible(tmp_path, monkeypatch):
         return out.read_text(encoding="utf-8")
 
     assert _run() == _run()
+
+
+# --- Sensor ---
+def test_sensor_from_config_without_update_rate():
+    sensor = g.Sensor.from_config(
+        {"id": "RAD-TAC-2", "type": "RADAR_TACTICAL", "lat": 62.5, "lon": 29.7, "range_m": 25000}
+    )
+    assert sensor.id == "RAD-TAC-2"
+    assert sensor.type == "RADAR_TACTICAL"
+    assert sensor.lat == 62.5
+    assert sensor.lon == 29.7
+    assert sensor.range_m == 25000
+    assert sensor.update_rate_sec is None
+
+
+def test_sensor_from_config_with_update_rate():
+    sensor = g.Sensor.from_config(
+        {
+            "id": "RAD-TAC-2",
+            "type": "RADAR_TACTICAL",
+            "lat": 62.5,
+            "lon": 29.7,
+            "range_m": 25000,
+            "update_rate_sec": 15,
+        }
+    )
+    assert sensor.update_rate_sec == 15
+
+
+def test_sensor_code_trailing_digit():
+    sensor = g.Sensor.from_config(
+        {"id": "RAD-TAC-2", "type": "RADAR_TACTICAL", "lat": 0, "lon": 0, "range_m": 1}
+    )
+    assert sensor.code == "A-02"
+
+
+def test_sensor_code_trailing_non_digit():
+    sensor = g.Sensor.from_config(
+        {"id": "ACU-X", "type": "ACOUSTIC", "lat": 0, "lon": 0, "range_m": 1}
+    )
+    assert sensor.code == "A-01"
+
+
+# --- ThreatWave ---
+def test_threat_wave_from_config():
+    cfg = {
+        "id_suffix": "DIVE",
+        "count": 8,
+        "speed_kmh": 20,
+        "alt_m": 2000,
+        "classification": "UAV_Kamikaze",
+        "launch_delay_sec": 0,
+        "wkt_linestring": "LINESTRING (29.50 62.50, 29.49 62.49)",
+    }
+    wave = g.ThreatWave.from_config("SW_dive", cfg)
+    assert wave.wave_id == "SW_dive"
+    assert wave.id_suffix == "DIVE"
+    assert wave.count == 8
+    assert wave.speed_kmh == 20
+    assert wave.alt_m == 2000
+    assert wave.classification == "UAV_Kamikaze"
+    assert wave.launch_delay_sec == 0
+    assert wave.waypoints == [{"lat": 62.50, "lon": 29.50}, {"lat": 62.49, "lon": 29.49}]
+
+
+def test_threat_wave_prefix():
+    cfg = {
+        "id_suffix": "DIVE",
+        "count": 8,
+        "speed_kmh": 20,
+        "alt_m": 2000,
+        "classification": "UAV_Kamikaze",
+        "launch_delay_sec": 0,
+        "wkt_linestring": "LINESTRING (29.50 62.50, 29.49 62.49)",
+    }
+    wave = g.ThreatWave.from_config("SW_dive", cfg)
+    assert wave.prefix == "SW"
+
+
+# --- parse_args ---
+def test_parse_args_defaults():
+    args = g.parse_args(["--scenario", "x.json"])
+    assert args.scenario == "x.json"
+    assert args.output == str(config.GENERATED_DIR)
+    assert args.seed is None
+
+
+def test_parse_args_seed():
+    args = g.parse_args(["--scenario", "x.json", "--seed", "5"])
+    assert args.seed == 5
+
+
+# --- load_scenario ---
+def test_load_scenario_missing(tmp_path, capsys):
+    missing = tmp_path / "nope.json"
+    assert g.load_scenario(str(missing)) is None
+    assert "not found" in capsys.readouterr().out
+
+
+def test_load_scenario_hit(tmp_path):
+    scen = tmp_path / "scen.json"
+    data = {"a": 1, "b": [2, 3]}
+    scen.write_text(json.dumps(data), encoding="utf-8")
+    assert g.load_scenario(str(scen)) == data
+
+
+# --- prepare_threat_waves ---
+def test_prepare_threat_waves_order_and_parsing():
+    scenario = {
+        "threat_profiles": {
+            "SW_dive": {
+                "id_suffix": "DIVE",
+                "count": 8,
+                "speed_kmh": 20,
+                "alt_m": 2000,
+                "classification": "UAV_Kamikaze",
+                "launch_delay_sec": 0,
+                "wkt_linestring": "LINESTRING (29.50 62.50, 29.49 62.49)",
+            },
+            "FP_v": {
+                "id_suffix": "FPV",
+                "count": 6,
+                "speed_kmh": 20,
+                "alt_m": 100,
+                "classification": "UAV_Rotary_FPV",
+                "launch_delay_sec": 0,
+                "wkt_linestring": "LINESTRING (29.70 62.50, 29.69 62.49)",
+            },
+        }
+    }
+    waves = g.prepare_threat_waves(scenario)
+    assert [w.wave_id for w in waves] == ["SW_dive", "FP_v"]
+    assert all(isinstance(w, g.ThreatWave) for w in waves)
+    assert waves[0].waypoints == [{"lat": 62.50, "lon": 29.50}, {"lat": 62.49, "lon": 29.49}]
+    assert waves[1].waypoints == [{"lat": 62.50, "lon": 29.70}, {"lat": 62.49, "lon": 29.69}]
+
+
+# --- DetectionReportBuilder.build() ---
+def _wave_obj(wave_id, id_suffix, count, classification):
+    return g.ThreatWave(
+        wave_id=wave_id,
+        id_suffix=id_suffix,
+        count=count,
+        speed_kmh=20,
+        alt_m=2000,
+        classification=classification,
+        launch_delay_sec=0,
+        waypoints=[],
+    )
+
+
+def test_detection_report_builder_swarm_branch():
+    thresholds = constants.resolve_detection_thresholds({})
+    sensor = g.Sensor(id="RAD-STRAT-1", type="RADAR_STRATEGIC", lat=62.6, lon=29.5, range_m=150000)
+    wave = _wave_obj("SW_dive", "DIVE", count=8, classification="UAV_Kamikaze")
+    builder = g.DetectionReportBuilder(
+        sensor,
+        wave,
+        thresholds,
+        lat=62.5,
+        lon=29.5,
+        noisy_lat=62.5001,
+        noisy_lon=29.5001,
+        absolute_altitude_msl=2080.0,
+        dist=9000,
+        mps=5.5,
+        brg=45.0,
+        is_diving=True,
+        calculated_conf=0.8,
+        current_sim_time=datetime(2026, 1, 1),
+    )
+    rep_dict, extra = builder.build()
+    assert "-SWM-" in rep_dict["objectId"]
+    assert "location" in rep_dict
+    assert extra["measuredAttributes"]["estimatedSwarmCount"] == wave.count
+    assert extra["measuredAttributes"]["tacticalState"] == "TERMINAL_DIVE"
+
+
+def test_detection_report_builder_micro_doppler_fpv_diving_branch():
+    thresholds = constants.resolve_detection_thresholds({})
+    sensor = g.Sensor(id="MDOP-A", type="MICRO_DOPPLER", lat=62.505, lon=29.70, range_m=3500)
+    wave = _wave_obj("FP_v", "FPV", count=6, classification="UAV_Rotary_FPV")
+    builder = g.DetectionReportBuilder(
+        sensor,
+        wave,
+        thresholds,
+        lat=62.5,
+        lon=29.7,
+        noisy_lat=62.5001,
+        noisy_lon=29.7001,
+        absolute_altitude_msl=100.0,
+        dist=100,
+        mps=5.5,
+        brg=45.0,
+        is_diving=True,
+        calculated_conf=0.8,
+        current_sim_time=datetime(2026, 1, 1),
+    )
+    rep_dict, extra = builder.build()
+    assert "-IND-" in rep_dict["objectId"]
+    assert "enuVelocity" in rep_dict
+    assert extra["measuredAttributes"]["microDopplerRotorSpeedRps"] == 220.0
+    assert extra["measuredAttributes"]["maneuverState"] == "HIGH_G_DIVE"
+
+
+def test_detection_report_builder_acoustic_branch():
+    thresholds = constants.resolve_detection_thresholds({})
+    sensor = g.Sensor(id="ACU-X", type="ACOUSTIC", lat=62.50, lon=29.70, range_m=3000)
+    wave = _wave_obj("SW_dive", "DIVE", count=8, classification="UAV_Kamikaze")
+    builder = g.DetectionReportBuilder(
+        sensor,
+        wave,
+        thresholds,
+        lat=62.501,
+        lon=29.701,
+        noisy_lat=62.501,
+        noisy_lon=29.701,
+        absolute_altitude_msl=100.0,
+        dist=150.0,
+        mps=5.5,
+        brg=45.0,
+        is_diving=False,
+        calculated_conf=0.8,
+        current_sim_time=datetime(2026, 1, 1),
+    )
+    rep_dict, _extra = builder.build()
+    assert rep_dict["objectId"].startswith("ACU-")
+    assert "rangeBearing" in rep_dict

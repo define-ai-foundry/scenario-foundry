@@ -7,6 +7,7 @@ import math
 import os
 import random
 import re
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 # --- PROTOBUF IMPORTS ---
@@ -181,8 +182,355 @@ def calculate_dynamic_confidence(dist, max_range, sensor_type):
     return round(max(0.10, min(0.99, base_conf + scintillation)), 2)
 
 
-# --- MAIN GENERATION ENGINE ---
-def main():
+# --- SCENARIO MODEL ---
+@dataclass(frozen=True)
+class ThreatWave:
+    """A parsed threat-profile entry: kinematics, classification, and its flight path."""
+
+    wave_id: str
+    id_suffix: str
+    count: int
+    speed_kmh: float
+    alt_m: float
+    classification: str
+    launch_delay_sec: float
+    waypoints: list
+
+    @classmethod
+    def from_config(cls, wave_id, cfg):
+        """Build a ThreatWave from a threat_profiles config entry, parsing its WKT linestring."""
+        return cls(
+            wave_id=wave_id,
+            id_suffix=cfg["id_suffix"],
+            count=cfg["count"],
+            speed_kmh=cfg["speed_kmh"],
+            alt_m=cfg["alt_m"],
+            classification=cfg["classification"],
+            launch_delay_sec=cfg["launch_delay_sec"],
+            waypoints=parse_wkt(cfg["wkt_linestring"]),
+        )
+
+    @property
+    def prefix(self):
+        """Two-letter objectId prefix derived from the wave id."""
+        return self.wave_id[:2]
+
+
+@dataclass(frozen=True)
+class Sensor:
+    """A parsed sensor-network entry: identity, position, and detection range."""
+
+    id: str
+    type: str
+    lat: float
+    lon: float
+    range_m: float
+    update_rate_sec: float | None = None
+
+    @classmethod
+    def from_config(cls, cfg):
+        """Build a Sensor from a sensor_network config entry."""
+        return cls(
+            id=cfg["id"],
+            type=cfg["type"],
+            lat=cfg["lat"],
+            lon=cfg["lon"],
+            range_m=cfg["range_m"],
+            update_rate_sec=cfg.get("update_rate_sec"),
+        )
+
+    @property
+    def code(self):
+        """Short sensor code derived from the trailing id digit (fallback '1')."""
+        return f"A-0{self.id[-1:] if self.id[-1:].isdigit() else '1'}"
+
+
+# --- DETECTION REPORT ASSEMBLY ---
+class DetectionReportBuilder:
+    """Builds the sensor-type-specific BSI Flex 335 payload for one detection."""
+
+    def __init__(
+        self,
+        sensor,
+        wave,
+        thresholds,
+        *,
+        lat,
+        lon,
+        noisy_lat,
+        noisy_lon,
+        absolute_altitude_msl,
+        dist,
+        mps,
+        brg,
+        is_diving,
+        calculated_conf,
+        current_sim_time,
+    ):
+        self.sensor = sensor
+        self.wave = wave
+        self.thresholds = thresholds
+        self.lat = lat
+        self.lon = lon
+        self.noisy_lat = noisy_lat
+        self.noisy_lon = noisy_lon
+        self.absolute_altitude_msl = absolute_altitude_msl
+        self.dist = dist
+        self.mps = mps
+        self.brg = brg
+        self.is_diving = is_diving
+        self.calculated_conf = calculated_conf
+        self.current_sim_time = current_sim_time
+
+    def build(self):
+        """Return (rep_dict, extra_attributes) for this sensor/wave combination."""
+        sensor, wave, thresholds = self.sensor, self.wave, self.thresholds
+
+        # 1. Build the Complex Detection Report Dictionary
+        rep_dict = {
+            "state": constants.DETECTION_STATE_ACTIVE,
+            "classification": [
+                {"type": wave.classification.upper(), "confidence": self.calculated_conf}
+            ],
+        }
+
+        pfx = wave.prefix
+        s_code = sensor.code
+
+        # We hold custom simulation attributes here to bypass strict core validation
+        extra_attributes = {}
+
+        # 2. Append Sensor Payloads directly to rep_dict.
+        # EVERY location block MUST USE WGS84_STR dynamically.
+        switch_m = thresholds["radar_swarm_indicator_switch_m"]
+        if constants.SensorType.is_radar(sensor.type) and self.dist > switch_m:
+            rep_dict["objectId"] = f"{s_code}-SWM-{pfx}_{wave.id_suffix}"
+            rep_dict["location"] = make_location(
+                self.noisy_lat, self.noisy_lon, self.absolute_altitude_msl
+            )
+            extra_attributes["measuredAttributes"] = {"estimatedSwarmCount": wave.count}
+            if self.is_diving:
+                extra_attributes["measuredAttributes"]["tacticalState"] = (
+                    constants.TACTICAL_STATE_TERMINAL_DIVE
+                )
+
+        elif (
+            sensor.type in [constants.SensorType.MICRO_DOPPLER, constants.SensorType.RADAR_TACTICAL]
+            and self.dist <= switch_m
+        ):
+            rep_dict["objectId"] = f"{s_code}-IND-{pfx}_{wave.id_suffix}_0{wave.count - 2}"
+            rep_dict["location"] = make_location(
+                self.noisy_lat, self.noisy_lon, self.absolute_altitude_msl
+            )
+            v_up = -15.0 if self.is_diving else 0.0
+
+            east = self.mps * math.sin(math.radians(self.brg))
+            north = self.mps * math.cos(math.radians(self.brg))
+
+            rep_dict["enuVelocity"] = make_velocity(east, north, v_up)
+
+            if sensor.type == constants.SensorType.MICRO_DOPPLER:
+                extra_attributes["measuredAttributes"] = {
+                    "microDopplerRotorSpeedRps": constants.ROTOR_SPEED_FPV_RPS
+                    if constants.CLASSIFICATION_FPV_MARKER in wave.classification
+                    else constants.ROTOR_SPEED_DEFAULT_RPS
+                }
+                if self.is_diving:
+                    extra_attributes["measuredAttributes"]["maneuverState"] = (
+                        constants.MANEUVER_STATE_HIGH_G_DIVE
+                    )
+
+        elif sensor.type == constants.SensorType.ACOUSTIC:
+            rep_dict["objectId"] = f"ACU-{s_code}_{pfx}_{wave.id_suffix}"
+            noisy_bearing = (
+                calc_bearing(sensor.lat, sensor.lon, self.lat, self.lon) + random.gauss(0, 3.5)
+            ) % 360
+
+            rep_dict["rangeBearing"] = make_range_bearing(noisy_bearing, self.dist)
+
+        elif (
+            sensor.type == constants.SensorType.THERMAL_CAM
+            and self.dist <= thresholds["thermal_cam_max_range_m"]
+        ):
+            rep_dict["objectId"] = f"CAM-{s_code}_{pfx}_{wave.id_suffix}"
+            rep_dict["location"] = make_location(
+                self.noisy_lat, self.noisy_lon, self.absolute_altitude_msl
+            )
+            extra_attributes["opticalAttributes"] = {
+                "spectrumChannel": constants.SPECTRUM_LWIR_THERMAL,
+                "visualConfirmation": constants.VISUAL_CONFIRMATION_POSITIVE,
+                "targetThermalIntensity": constants.THERMAL_INTENSITY_HIGH,
+            }
+
+        elif (
+            sensor.type == constants.SensorType.VISUAL_CAM
+            and self.dist <= thresholds["visual_cam_max_range_m"]
+        ):
+            solar_elevation = calculate_solar_elevation(
+                sensor.lat, sensor.lon, self.current_sim_time
+            )
+            rep_dict["objectId"] = f"CAM-{s_code}_{pfx}_{wave.id_suffix}"
+            rep_dict["location"] = make_location(
+                self.noisy_lat, self.noisy_lon, self.absolute_altitude_msl
+            )
+            if solar_elevation > thresholds["civil_twilight_elevation_deg"]:
+                extra_attributes["opticalAttributes"] = {
+                    "spectrumChannel": constants.SPECTRUM_VISIBLE_COLOR,
+                    "visualConfirmation": constants.VISUAL_CONFIRMATION_POSITIVE,
+                    "illuminationStatus": constants.ILLUMINATION_OPTIMAL,
+                }
+            else:
+                extra_attributes["opticalAttributes"] = {
+                    "spectrumChannel": constants.SPECTRUM_VISIBLE_COLOR,
+                    "visualConfirmation": constants.VISUAL_CONFIRMATION_UNCONFIRMED,
+                    "illuminationStatus": constants.ILLUMINATION_POOR_BLIND,
+                }
+
+        return rep_dict, extra_attributes
+
+
+def compute_noisy_position(sensor, lat, lon, dist):
+    """Apply sensor-type-specific Gaussian position noise (radar/optical/micro-doppler)."""
+    if constants.SensorType.is_radar(sensor.type):
+        sigma_meters = 5.0 + (30.0 * (dist / sensor.range_m))
+        return add_metric_noise_to_wgs84(
+            lat, lon, random.gauss(0, sigma_meters), random.gauss(0, sigma_meters)
+        )
+    elif sensor.type in [constants.SensorType.THERMAL_CAM, constants.SensorType.VISUAL_CAM]:
+        sigma_meters = 2.0 + (15.0 * ((dist / sensor.range_m) ** 2))
+        return add_metric_noise_to_wgs84(
+            lat, lon, random.gauss(0, sigma_meters), random.gauss(0, sigma_meters)
+        )
+    elif sensor.type == constants.SensorType.MICRO_DOPPLER:
+        sigma_m = random.gauss(0, 1.5)
+        return add_metric_noise_to_wgs84(lat, lon, sigma_m, sigma_m)
+    return lat, lon
+
+
+def validate_and_wrap(rep_dict, extra_attributes, sensor, ts_str, step):
+    """Validate rep_dict against the DetectionReport proto and wrap it in a sapientMessage."""
+    try:
+        # Validate the STRICT core payload
+        proto_rep = detection_report_pb2.DetectionReport()
+        json_format.ParseDict(rep_dict, proto_rep, ignore_unknown_fields=False)
+        valid_rep = json_format.MessageToDict(
+            proto_rep,
+            preserving_proto_field_name=False,
+            always_print_fields_with_no_presence=True,
+        )
+
+        # Inject custom/extension attributes back into the validated payload safely
+        valid_rep.update(extra_attributes)
+
+        # Manually stitch into the required top-level SAPIENT JSON structure
+        return {
+            "sapientMessage": {
+                "header": {
+                    "icdVersion": constants.ICD_VERSION,
+                    "timestamp": ts_str,
+                    "sourceNode": {
+                        "nodeId": str(sensor.id),
+                        "type": constants.NODE_TYPE_CHILD,
+                    },
+                },
+                "detectionReport": valid_rep,
+            }
+        }
+    except Exception as e:
+        print(f"CRITICAL PROTOC VALIDATION ERROR at step {step}: {e}")
+        raise
+
+
+def generate_detection_for_sensor(
+    sensor, wave, adjusted_elapsed, current_sim_time, ts_str, scenario, thresholds, step
+):
+    """Compute one sensor/wave detection entry for the current step, or None if a guard rejects it."""
+    if adjusted_elapsed < wave.launch_delay_sec:
+        return None
+
+    mps = (wave.speed_kmh * 1000) / 3600
+    dist_traveled = mps * (adjusted_elapsed - wave.launch_delay_sec)
+    lat, lon, brg, ratio, is_final_leg, impacted = get_position(wave.waypoints, dist_traveled)
+    if impacted:
+        return None
+
+    dist = haversine_dist(sensor.lat, sensor.lon, lat, lon)
+    if dist > sensor.range_m:
+        return None
+
+    ground_height_msl = get_terrain_elevation(lat, lon, scenario)
+    current_agl = wave.alt_m
+    if is_final_leg and wave.classification != constants.CLASSIFICATION_DECOY:
+        current_agl = wave.alt_m * (1.0 - ratio)
+
+    absolute_altitude_msl = ground_height_msl + current_agl
+    if (
+        sensor.type == constants.SensorType.RADAR_STRATEGIC
+        and absolute_altitude_msl < thresholds["radar_strategic_min_altitude_m"]
+    ):
+        return None
+
+    noisy_lat, noisy_lon = compute_noisy_position(sensor, lat, lon, dist)
+
+    calculated_conf = calculate_dynamic_confidence(dist, sensor.range_m, sensor.type)
+    if sensor.type == constants.SensorType.VISUAL_CAM:
+        solar_elevation = calculate_solar_elevation(sensor.lat, sensor.lon, current_sim_time)
+        if solar_elevation <= thresholds["civil_twilight_elevation_deg"]:
+            calculated_conf = 0.12
+
+    is_diving = is_final_leg and wave.classification != constants.CLASSIFICATION_DECOY
+
+    builder = DetectionReportBuilder(
+        sensor,
+        wave,
+        thresholds,
+        lat=lat,
+        lon=lon,
+        noisy_lat=noisy_lat,
+        noisy_lon=noisy_lon,
+        absolute_altitude_msl=absolute_altitude_msl,
+        dist=dist,
+        mps=mps,
+        brg=brg,
+        is_diving=is_diving,
+        calculated_conf=calculated_conf,
+        current_sim_time=current_sim_time,
+    )
+    rep_dict, extra_attributes = builder.build()
+    return validate_and_wrap(rep_dict, extra_attributes, sensor, ts_str, step)
+
+
+def generate_detections_for_sensor(sensor, waves, scenario, meta, thresholds, start_dt, duration):
+    """Step through a sensor's scan schedule, collecting one entry per wave that passes guards."""
+    entries = []
+    scan_interval = (
+        sensor.update_rate_sec
+        if sensor.update_rate_sec is not None
+        else meta.get("time_step_seconds", 20.0)
+    )
+    steps = int(duration / scan_interval)
+
+    for step in range(steps + 1):
+        elapsed_time = step * scan_interval
+        jitter_sec = random.uniform(-0.05, 0.05)
+        adjusted_elapsed = max(0.0, elapsed_time + jitter_sec)
+
+        current_sim_time = start_dt + timedelta(seconds=adjusted_elapsed)
+        ts_str = current_sim_time.isoformat() + "Z"
+
+        for wave in waves:
+            entry = generate_detection_for_sensor(
+                sensor, wave, adjusted_elapsed, current_sim_time, ts_str, scenario, thresholds, step
+            )
+            if entry is not None:
+                entries.append(entry)
+
+    return entries
+
+
+# --- CLI / SCENARIO LOADING ---
+def parse_args(argv=None):
+    """Parse CLI args: --scenario (required), --output, --seed."""
     parser = argparse.ArgumentParser(
         description="Synchronized Plaintext ASC SAPIENT Telemetry Generator"
     )
@@ -198,17 +546,37 @@ def main():
         default=None,
         help="Integer RNG seed for reproducible output. Omit for non-deterministic runs.",
     )
-    args = parser.parse_args()
+    return parser.parse_args(argv)
+
+
+def load_scenario(path):
+    """Load and return the scenario JSON, or print an error and return None if missing."""
+    if not os.path.exists(path):
+        print(f"ERROR: Target tactical scenario file '{path}' not found.")
+        return None
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def prepare_threat_waves(scenario):
+    """Parse threat_profiles into ThreatWave objects, preserving config order."""
+    return [
+        ThreatWave.from_config(wave_id, wave_cfg)
+        for wave_id, wave_cfg in scenario["threat_profiles"].items()
+    ]
+
+
+# --- MAIN GENERATION ENGINE ---
+def main():
+    """CLI entrypoint: load a scenario, simulate detections, write the sorted SAPIENT JSON log."""
+    args = parse_args()
 
     if args.seed is not None:
         seed_all(args.seed)
 
-    if not os.path.exists(args.scenario):
-        print(f"ERROR: Target tactical scenario file '{args.scenario}' not found.")
+    scenario = load_scenario(args.scenario)
+    if scenario is None:
         return
-
-    with open(args.scenario, encoding="utf-8") as f:
-        scenario = json.load(f)
 
     meta = scenario["scenario_meta"]
     thresholds = constants.resolve_detection_thresholds(scenario)
@@ -217,227 +585,16 @@ def main():
 
     print(f"Executing Synchronized Generation Engine Theater: {meta['name']}")
 
-    threat_waves = {}
-    for wave_id, wave_cfg in scenario["threat_profiles"].items():
-        wave_cfg["waypoints"] = parse_wkt(wave_cfg["wkt_linestring"])
-        threat_waves[wave_id] = wave_cfg
+    threat_waves = prepare_threat_waves(scenario)
+    sensors = [Sensor.from_config(cfg) for cfg in scenario["sensor_network"]]
 
     json_log = []
-
-    for sens in scenario["sensor_network"]:
-        scan_interval = sens.get("update_rate_sec", meta.get("time_step_seconds", 20.0))
-        steps = int(duration / scan_interval)
-
-        for step in range(steps + 1):
-            elapsed_time = step * scan_interval
-            jitter_sec = random.uniform(-0.05, 0.05)
-            adjusted_elapsed = max(0.0, elapsed_time + jitter_sec)
-
-            current_sim_time = start_dt + timedelta(seconds=adjusted_elapsed)
-            ts_str = current_sim_time.isoformat() + "Z"
-
-            for wave_id, wave in threat_waves.items():
-                if adjusted_elapsed < wave["launch_delay_sec"]:
-                    continue
-
-                mps = (wave["speed_kmh"] * 1000) / 3600
-                dist_traveled = mps * (adjusted_elapsed - wave["launch_delay_sec"])
-                lat, lon, brg, ratio, is_final_leg, impacted = get_position(
-                    wave["waypoints"], dist_traveled
-                )
-                if impacted:
-                    continue
-
-                dist = haversine_dist(sens["lat"], sens["lon"], lat, lon)
-                if dist > sens["range_m"]:
-                    continue
-
-                ground_height_msl = get_terrain_elevation(lat, lon, scenario)
-                current_agl = wave["alt_m"]
-                if is_final_leg and wave["classification"] != constants.CLASSIFICATION_DECOY:
-                    current_agl = wave["alt_m"] * (1.0 - ratio)
-
-                absolute_altitude_msl = ground_height_msl + current_agl
-                if (
-                    sens["type"] == constants.SensorType.RADAR_STRATEGIC
-                    and absolute_altitude_msl < thresholds["radar_strategic_min_altitude_m"]
-                ):
-                    continue
-
-                noisy_lat, noisy_lon = lat, lon
-                if constants.SensorType.is_radar(sens["type"]):
-                    sigma_meters = 5.0 + (30.0 * (dist / sens["range_m"]))
-                    noisy_lat, noisy_lon = add_metric_noise_to_wgs84(
-                        lat, lon, random.gauss(0, sigma_meters), random.gauss(0, sigma_meters)
-                    )
-                elif sens["type"] in [
-                    constants.SensorType.THERMAL_CAM,
-                    constants.SensorType.VISUAL_CAM,
-                ]:
-                    sigma_meters = 2.0 + (15.0 * ((dist / sens["range_m"]) ** 2))
-                    noisy_lat, noisy_lon = add_metric_noise_to_wgs84(
-                        lat, lon, random.gauss(0, sigma_meters), random.gauss(0, sigma_meters)
-                    )
-                elif sens["type"] == constants.SensorType.MICRO_DOPPLER:
-                    sigma_m = random.gauss(0, 1.5)
-                    noisy_lat, noisy_lon = add_metric_noise_to_wgs84(lat, lon, sigma_m, sigma_m)
-
-                calculated_conf = calculate_dynamic_confidence(dist, sens["range_m"], sens["type"])
-                if sens["type"] == constants.SensorType.VISUAL_CAM:
-                    solar_elevation = calculate_solar_elevation(
-                        sens["lat"], sens["lon"], current_sim_time
-                    )
-                    if solar_elevation <= thresholds["civil_twilight_elevation_deg"]:
-                        calculated_conf = 0.12
-
-                # -------------------------------------------------------------
-                # START REFACTOR: BSI FLEX 335 v2.0 STRICT COMPLIANCE BLOCK
-                # -------------------------------------------------------------
-
-                # 1. Build the Complex Detection Report Dictionary
-                rep_dict = {
-                    "state": constants.DETECTION_STATE_ACTIVE,
-                    "classification": [
-                        {"type": wave["classification"].upper(), "confidence": calculated_conf}
-                    ],
-                }
-
-                pfx = wave_id[:2]
-                s_code = f"A-0{sens['id'][-1:] if sens['id'][-1:].isdigit() else '1'}"
-                is_diving = (
-                    is_final_leg and wave["classification"] != constants.CLASSIFICATION_DECOY
-                )
-
-                # We hold custom simulation attributes here to bypass strict core validation
-                extra_attributes = {}
-
-                # 2. Append Sensor Payloads directly to rep_dict.
-                # EVERY location block MUST USE WGS84_STR dynamically.
-                switch_m = thresholds["radar_swarm_indicator_switch_m"]
-                if constants.SensorType.is_radar(sens["type"]) and dist > switch_m:
-                    rep_dict["objectId"] = f"{s_code}-SWM-{pfx}_{wave['id_suffix']}"
-                    rep_dict["location"] = make_location(
-                        noisy_lat, noisy_lon, absolute_altitude_msl
-                    )
-                    extra_attributes["measuredAttributes"] = {"estimatedSwarmCount": wave["count"]}
-                    if is_diving:
-                        extra_attributes["measuredAttributes"]["tacticalState"] = (
-                            constants.TACTICAL_STATE_TERMINAL_DIVE
-                        )
-
-                elif (
-                    sens["type"]
-                    in [constants.SensorType.MICRO_DOPPLER, constants.SensorType.RADAR_TACTICAL]
-                    and dist <= switch_m
-                ):
-                    rep_dict["objectId"] = (
-                        f"{s_code}-IND-{pfx}_{wave['id_suffix']}_0{wave['count'] - 2}"
-                    )
-                    rep_dict["location"] = make_location(
-                        noisy_lat, noisy_lon, absolute_altitude_msl
-                    )
-                    v_up = -15.0 if is_diving else 0.0
-
-                    east = mps * math.sin(math.radians(brg))
-                    north = mps * math.cos(math.radians(brg))
-
-                    rep_dict["enuVelocity"] = make_velocity(east, north, v_up)
-
-                    if sens["type"] == constants.SensorType.MICRO_DOPPLER:
-                        extra_attributes["measuredAttributes"] = {
-                            "microDopplerRotorSpeedRps": constants.ROTOR_SPEED_FPV_RPS
-                            if constants.CLASSIFICATION_FPV_MARKER in wave["classification"]
-                            else constants.ROTOR_SPEED_DEFAULT_RPS
-                        }
-                        if is_diving:
-                            extra_attributes["measuredAttributes"]["maneuverState"] = (
-                                constants.MANEUVER_STATE_HIGH_G_DIVE
-                            )
-
-                elif sens["type"] == constants.SensorType.ACOUSTIC:
-                    rep_dict["objectId"] = f"ACU-{s_code}_{pfx}_{wave['id_suffix']}"
-                    noisy_bearing = (
-                        calc_bearing(sens["lat"], sens["lon"], lat, lon) + random.gauss(0, 3.5)
-                    ) % 360
-
-                    rep_dict["rangeBearing"] = make_range_bearing(noisy_bearing, dist)
-
-                elif (
-                    sens["type"] == constants.SensorType.THERMAL_CAM
-                    and dist <= thresholds["thermal_cam_max_range_m"]
-                ):
-                    rep_dict["objectId"] = f"CAM-{s_code}_{pfx}_{wave['id_suffix']}"
-                    rep_dict["location"] = make_location(
-                        noisy_lat, noisy_lon, absolute_altitude_msl
-                    )
-                    extra_attributes["opticalAttributes"] = {
-                        "spectrumChannel": constants.SPECTRUM_LWIR_THERMAL,
-                        "visualConfirmation": constants.VISUAL_CONFIRMATION_POSITIVE,
-                        "targetThermalIntensity": constants.THERMAL_INTENSITY_HIGH,
-                    }
-
-                elif (
-                    sens["type"] == constants.SensorType.VISUAL_CAM
-                    and dist <= thresholds["visual_cam_max_range_m"]
-                ):
-                    solar_elevation = calculate_solar_elevation(
-                        sens["lat"], sens["lon"], current_sim_time
-                    )
-                    rep_dict["objectId"] = f"CAM-{s_code}_{pfx}_{wave['id_suffix']}"
-                    rep_dict["location"] = make_location(
-                        noisy_lat, noisy_lon, absolute_altitude_msl
-                    )
-                    if solar_elevation > thresholds["civil_twilight_elevation_deg"]:
-                        extra_attributes["opticalAttributes"] = {
-                            "spectrumChannel": constants.SPECTRUM_VISIBLE_COLOR,
-                            "visualConfirmation": constants.VISUAL_CONFIRMATION_POSITIVE,
-                            "illuminationStatus": constants.ILLUMINATION_OPTIMAL,
-                        }
-                    else:
-                        extra_attributes["opticalAttributes"] = {
-                            "spectrumChannel": constants.SPECTRUM_VISIBLE_COLOR,
-                            "visualConfirmation": constants.VISUAL_CONFIRMATION_UNCONFIRMED,
-                            "illuminationStatus": constants.ILLUMINATION_POOR_BLIND,
-                        }
-
-                # 3. The Modular Validation Sandbox
-                try:
-                    # Validate the STRICT core payload
-                    proto_rep = detection_report_pb2.DetectionReport()
-                    json_format.ParseDict(rep_dict, proto_rep, ignore_unknown_fields=False)
-                    valid_rep = json_format.MessageToDict(
-                        proto_rep,
-                        preserving_proto_field_name=False,
-                        always_print_fields_with_no_presence=True,
-                    )
-
-                    # Inject custom/extension attributes back into the validated payload safely
-                    valid_rep.update(extra_attributes)
-
-                    # 4. Manually stitch into the required top-level SAPIENT JSON structure
-                    json_log.append(
-                        {
-                            "sapientMessage": {
-                                "header": {
-                                    "icdVersion": constants.ICD_VERSION,
-                                    "timestamp": ts_str,
-                                    "sourceNode": {
-                                        "nodeId": str(sens["id"]),
-                                        "type": constants.NODE_TYPE_CHILD,
-                                    },
-                                },
-                                "detectionReport": valid_rep,
-                            }
-                        }
-                    )
-
-                except Exception as e:
-                    print(f"CRITICAL PROTOC VALIDATION ERROR at step {step}: {e}")
-                    raise
-
-                # -------------------------------------------------------------
-                # END REFACTOR BLOCK
-                # -------------------------------------------------------------
+    for sensor in sensors:
+        json_log.extend(
+            generate_detections_for_sensor(
+                sensor, threat_waves, scenario, meta, thresholds, start_dt, duration
+            )
+        )
 
     json_log.sort(key=lambda x: x["sapientMessage"]["header"]["timestamp"])
 
