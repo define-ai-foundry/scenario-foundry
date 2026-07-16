@@ -5,8 +5,9 @@
 
 Core SAPIENT fields are set on the proto message itself, so protobuf enforces field
 names, types and enum values at assembly time. Custom simulation attributes that are
-not part of the ICD (measuredAttributes, opticalAttributes, ...) live outside the proto
-and are merged into the serialized dict by `serialize_report`.
+not part of the ICD (measuredAttributes, opticalAttributes, ...) have no proto home of
+their own, so `serialize_report` folds them into the proto's repeated `object_info`
+(TrackObjectInfo) field before serialization.
 """
 
 from google.protobuf import json_format
@@ -86,13 +87,24 @@ def add_classification(report, class_type, confidence):
     return entry
 
 
+def add_object_info(report, info_type, value):
+    """Append one object_info entry (TrackObjectInfo) to a DetectionReport."""
+    entry = report.object_info.add()
+    entry.type = info_type
+    entry.value = str(value)
+    return entry
+
+
 def serialize_report(report, extra_attributes=None):
     """Serialize a DetectionReport proto to its SAPIENT camelCase dict.
 
-    Non-ICD simulation attributes (measuredAttributes, opticalAttributes, ...) are merged
-    in after serialization since they have no place in the strict proto schema.
+    Non-ICD simulation attributes (measuredAttributes, opticalAttributes, ...) have no
+    place in the strict proto schema, so each leaf key/value from every group in
+    `extra_attributes` is folded into the proto's repeated `object_info` field
+    (TrackObjectInfo{type, value}) before serialization.
     """
-    payload = json_format.MessageToDict(report, **_TO_DICT_OPTS)
     if extra_attributes:
-        payload.update(extra_attributes)
-    return payload
+        for group in extra_attributes.values():
+            for key, value in group.items():
+                add_object_info(report, key, value)
+    return json_format.MessageToDict(report, **_TO_DICT_OPTS)

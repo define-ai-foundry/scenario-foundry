@@ -102,20 +102,18 @@ def test_export_sensor_detections_full_and_defaults(tmp_path):
     messages = [
         {
             "sapientMessage": {
-                "header": {
-                    "timestamp": "2026-01-01T00:00:00Z",
-                    "sourceNode": {"nodeId": "S1"},
-                },
+                "timestamp": "2026-01-01T00:00:00Z",
+                "nodeId": "S1",
                 "detectionReport": {
                     "objectId": "O1",
                     "state": "ACTIVE",
                     "classification": [{"type": "UAV_X", "confidence": 0.9}],
                     "location": {"x": 29.0, "y": 62.0, "z": 120.0},
-                    "measuredAttributes": {"estimatedSwarmCount": 7},
+                    "objectInfo": [{"type": "estimatedSwarmCount", "value": "7"}],
                 },
             }
         },
-        {"sapientMessage": {"header": {}, "detectionReport": {}}},
+        {"sapientMessage": {"detectionReport": {}}},
     ]
     es.export_sensor_detections(messages, str(tmp_path))
     with open(tmp_path / "sensor_detections_layer.csv", encoding="utf-8", newline="") as f:
@@ -159,9 +157,7 @@ def _write_inputs(tmp_path):
     scen = tmp_path / "scen_tactical.json"
     scen.write_text(json.dumps(_tactical()), encoding="utf-8")
     msgs = tmp_path / "scen_messages.json"
-    msgs.write_text(
-        json.dumps([{"sapientMessage": {"header": {}, "detectionReport": {}}}]), encoding="utf-8"
-    )
+    msgs.write_text(json.dumps([{"sapientMessage": {"detectionReport": {}}}]), encoding="utf-8")
     return scen, msgs
 
 

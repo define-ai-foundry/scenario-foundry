@@ -412,14 +412,8 @@ def serialize_and_wrap(report, extra_attributes, sensor, ts_str, step):
         # Manually stitch into the required top-level SAPIENT JSON structure
         return {
             "sapientMessage": {
-                "header": {
-                    "icdVersion": constants.ICD_VERSION,
-                    "timestamp": ts_str,
-                    "sourceNode": {
-                        "nodeId": str(sensor.id),
-                        "type": constants.NODE_TYPE_CHILD,
-                    },
-                },
+                "timestamp": ts_str,
+                "nodeId": str(sensor.id),
                 "detectionReport": detection_report,
             }
         }
@@ -583,7 +577,7 @@ def main():
             )
         )
 
-    json_log.sort(key=lambda x: x["sapientMessage"]["header"]["timestamp"])
+    json_log.sort(key=lambda x: x["sapientMessage"]["timestamp"])
 
     os.makedirs(
         os.path.dirname(args.output) if os.path.dirname(args.output) else ".", exist_ok=True

@@ -62,6 +62,14 @@ def test_add_classification_appends_entry():
     assert entry.confidence == pytest.approx(0.83, abs=1e-6)
 
 
+def test_add_object_info_appends_entry():
+    report = builder.DetectionReport()
+    entry = builder.add_object_info(report, "estimatedSwarmCount", 8)
+    assert len(report.object_info) == 1
+    assert entry.type == "estimatedSwarmCount"
+    assert entry.value == "8"
+
+
 def test_serialize_report_camel_case_and_extra_merge():
     report = builder.DetectionReport(state="ACTIVE")
     report.object_id = "A-01-SWM-SW_DIVE"
@@ -70,11 +78,11 @@ def test_serialize_report_camel_case_and_extra_merge():
     assert payload["state"] == "ACTIVE"
     assert payload["objectId"] == "A-01-SWM-SW_DIVE"
     assert payload["location"]["coordinateSystem"] == builder.SAP_COORD_LAT_LNG_DEG_M
-    assert payload["measuredAttributes"] == {"estimatedSwarmCount": 8}
+    assert payload["objectInfo"] == [{"type": "estimatedSwarmCount", "value": "8"}]
 
 
 def test_serialize_report_without_extra_attributes():
     report = builder.DetectionReport(state="ACTIVE")
     payload = builder.serialize_report(report)
     assert payload["state"] == "ACTIVE"
-    assert "measuredAttributes" not in payload
+    assert payload["objectInfo"] == []

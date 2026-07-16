@@ -335,7 +335,7 @@ def _tactical_radar_object_ids(msgs):
     return [
         oid
         for m in msgs
-        if m["sapientMessage"]["header"]["sourceNode"]["nodeId"] == "RAD-TAC-2"
+        if m["sapientMessage"]["nodeId"] == "RAD-TAC-2"
         and "TA_TAC" in (oid := m["sapientMessage"]["detectionReport"].get("objectId", ""))
     ]
 
@@ -363,12 +363,16 @@ def test_radar_switch_threshold_is_configurable(tmp_path, monkeypatch):
     assert all("-SWM-" in oid for oid in lowered_ids)
 
 
+def _object_info_dict(report):
+    return {oi["type"]: oi["value"] for oi in report.get("objectInfo", [])}
+
+
 def _optical_statuses(msgs):
     statuses = set()
     for m in msgs:
-        opt = m["sapientMessage"]["detectionReport"].get("opticalAttributes", {})
-        if "illuminationStatus" in opt:
-            statuses.add(opt["illuminationStatus"])
+        info = _object_info_dict(m["sapientMessage"]["detectionReport"])
+        if "illuminationStatus" in info:
+            statuses.add(info["illuminationStatus"])
     return statuses
 
 
@@ -376,42 +380,38 @@ def test_main_night_run(tmp_path, monkeypatch):
     msgs = _run_main(tmp_path, "2026-11-15T02:45:00Z", monkeypatch)
     assert isinstance(msgs, list) and msgs
     # sorted ascending by timestamp
-    timestamps = [m["sapientMessage"]["header"]["timestamp"] for m in msgs]
+    timestamps = [m["sapientMessage"]["timestamp"] for m in msgs]
     assert timestamps == sorted(timestamps)
 
     m0 = msgs[0]["sapientMessage"]
-    assert m0["header"]["icdVersion"] == "2.0"
-    assert m0["header"]["sourceNode"]["type"] == "CHILD"
+    assert m0["nodeId"]
+    assert m0["timestamp"]
     assert m0["detectionReport"]["state"] == "ACTIVE"
     assert m0["detectionReport"]["classification"]
 
-    nodes = {m["sapientMessage"]["header"]["sourceNode"]["nodeId"] for m in msgs}
+    nodes = {m["sapientMessage"]["nodeId"] for m in msgs}
     assert {"RAD-STRAT-1", "RAD-TAC-2", "MDOP-A", "ACU-X", "THERM-1", "VIS-1"} <= nodes
 
     # swarm + terminal-dive from strategic radar
     swarm = [
         r
         for m in msgs
-        if "estimatedSwarmCount"
-        in (r := m["sapientMessage"]["detectionReport"]).get("measuredAttributes", {})
+        if "estimatedSwarmCount" in _object_info_dict(r := m["sapientMessage"]["detectionReport"])
     ]
-    assert any(
-        a.get("tacticalState") == "TERMINAL_DIVE" for a in (r["measuredAttributes"] for r in swarm)
-    )
+    assert any(_object_info_dict(r).get("tacticalState") == "TERMINAL_DIVE" for r in swarm)
 
     # micro-doppler rotor branches (both FPV=220 and plain=75)
     rotor_speeds = {
-        r["measuredAttributes"]["microDopplerRotorSpeedRps"]
+        _object_info_dict(r)["microDopplerRotorSpeedRps"]
         for m in msgs
         if "microDopplerRotorSpeedRps"
-        in (r := m["sapientMessage"]["detectionReport"]).get("measuredAttributes", {})
+        in _object_info_dict(r := m["sapientMessage"]["detectionReport"])
     }
-    assert rotor_speeds == {220.0, 75.0}
+    assert rotor_speeds == {"220.0", "75.0"}
 
     # HIGH_G_DIVE maneuver state present
     maneuvers = {
-        m["sapientMessage"]["detectionReport"].get("measuredAttributes", {}).get("maneuverState")
-        for m in msgs
+        _object_info_dict(m["sapientMessage"]["detectionReport"]).get("maneuverState") for m in msgs
     }
     assert "HIGH_G_DIVE" in maneuvers
 

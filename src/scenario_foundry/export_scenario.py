@@ -146,7 +146,6 @@ def export_sensor_detections(messages_data, output_dir):
         for entry in messages_data:
             msg = entry.get("sapientMessage", {})
 
-            header = msg.get("header", {})
             report = msg.get("detectionReport", {})
 
             # Classification
@@ -167,12 +166,12 @@ def export_sensor_detections(messages_data, output_dir):
             lat = location.get("y")
             alt = location.get("z", 0.0)
 
-            attributes = report.get("measuredAttributes", {})
+            attributes = {oi.get("type"): oi.get("value") for oi in report.get("objectInfo", [])}
 
             writer.writerow(
                 {
-                    "Timestamp": header.get("timestamp"),
-                    "Sensor_Node_ID": header.get("sourceNode", {}).get("nodeId"),
+                    "Timestamp": msg.get("timestamp"),
+                    "Sensor_Node_ID": msg.get("nodeId"),
                     "Track_ID": report.get("objectId"),
                     "Status": report.get("state"),
                     "Drone_Type": drone_type,
