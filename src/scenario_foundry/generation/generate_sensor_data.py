@@ -10,13 +10,15 @@ import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-# --- PROTOBUF IMPORTS ---
-from google.protobuf import json_format
-
-from sapient_msg.bsi_flex_335_v2_0 import detection_report_pb2
 from scenario_foundry import config, constants
 from scenario_foundry.rng import seed_all
-from scenario_foundry.sapient.builder import make_location, make_range_bearing, make_velocity
+from scenario_foundry.sapient import builder
+from scenario_foundry.sapient.builder import (
+    add_classification,
+    make_location,
+    make_range_bearing,
+    make_velocity,
+)
 
 
 # --- GEOSPATIAL & CELESTIAL MATH LIBRARY ---
@@ -283,30 +285,25 @@ class DetectionReportBuilder:
         self.current_sim_time = current_sim_time
 
     def build(self):
-        """Return (rep_dict, extra_attributes) for this sensor/wave combination."""
+        """Return (report, extra_attributes): the DetectionReport proto plus non-ICD attributes."""
         sensor, wave, thresholds = self.sensor, self.wave, self.thresholds
 
-        # 1. Build the Complex Detection Report Dictionary
-        rep_dict = {
-            "state": constants.DETECTION_STATE_ACTIVE,
-            "classification": [
-                {"type": wave.classification.upper(), "confidence": self.calculated_conf}
-            ],
-        }
+        # 1. Core report: strict ICD fields set directly on the proto.
+        report = builder.DetectionReport(state=constants.DETECTION_STATE_ACTIVE)
+        add_classification(report, wave.classification.upper(), self.calculated_conf)
 
         pfx = wave.prefix
         s_code = sensor.code
 
-        # We hold custom simulation attributes here to bypass strict core validation
+        # Custom simulation attributes live outside the strict proto schema.
         extra_attributes = {}
 
-        # 2. Append Sensor Payloads directly to rep_dict.
-        # EVERY location block MUST USE WGS84_STR dynamically.
+        # 2. Attach the sensor-type-specific payload to the proto.
         switch_m = thresholds["radar_swarm_indicator_switch_m"]
         if constants.SensorType.is_radar(sensor.type) and self.dist > switch_m:
-            rep_dict["objectId"] = f"{s_code}-SWM-{pfx}_{wave.id_suffix}"
-            rep_dict["location"] = make_location(
-                self.noisy_lat, self.noisy_lon, self.absolute_altitude_msl
+            report.object_id = f"{s_code}-SWM-{pfx}_{wave.id_suffix}"
+            report.location.CopyFrom(
+                make_location(self.noisy_lat, self.noisy_lon, self.absolute_altitude_msl)
             )
             extra_attributes["measuredAttributes"] = {"estimatedSwarmCount": wave.count}
             if self.is_diving:
@@ -318,16 +315,16 @@ class DetectionReportBuilder:
             sensor.type in [constants.SensorType.MICRO_DOPPLER, constants.SensorType.RADAR_TACTICAL]
             and self.dist <= switch_m
         ):
-            rep_dict["objectId"] = f"{s_code}-IND-{pfx}_{wave.id_suffix}_0{wave.count - 2}"
-            rep_dict["location"] = make_location(
-                self.noisy_lat, self.noisy_lon, self.absolute_altitude_msl
+            report.object_id = f"{s_code}-IND-{pfx}_{wave.id_suffix}_0{wave.count - 2}"
+            report.location.CopyFrom(
+                make_location(self.noisy_lat, self.noisy_lon, self.absolute_altitude_msl)
             )
             v_up = -15.0 if self.is_diving else 0.0
 
             east = self.mps * math.sin(math.radians(self.brg))
             north = self.mps * math.cos(math.radians(self.brg))
 
-            rep_dict["enuVelocity"] = make_velocity(east, north, v_up)
+            report.enu_velocity.CopyFrom(make_velocity(east, north, v_up))
 
             if sensor.type == constants.SensorType.MICRO_DOPPLER:
                 extra_attributes["measuredAttributes"] = {
@@ -341,20 +338,20 @@ class DetectionReportBuilder:
                     )
 
         elif sensor.type == constants.SensorType.ACOUSTIC:
-            rep_dict["objectId"] = f"ACU-{s_code}_{pfx}_{wave.id_suffix}"
+            report.object_id = f"ACU-{s_code}_{pfx}_{wave.id_suffix}"
             noisy_bearing = (
                 calc_bearing(sensor.lat, sensor.lon, self.lat, self.lon) + random.gauss(0, 3.5)
             ) % 360
 
-            rep_dict["rangeBearing"] = make_range_bearing(noisy_bearing, self.dist)
+            report.range_bearing.CopyFrom(make_range_bearing(noisy_bearing, self.dist))
 
         elif (
             sensor.type == constants.SensorType.THERMAL_CAM
             and self.dist <= thresholds["thermal_cam_max_range_m"]
         ):
-            rep_dict["objectId"] = f"CAM-{s_code}_{pfx}_{wave.id_suffix}"
-            rep_dict["location"] = make_location(
-                self.noisy_lat, self.noisy_lon, self.absolute_altitude_msl
+            report.object_id = f"CAM-{s_code}_{pfx}_{wave.id_suffix}"
+            report.location.CopyFrom(
+                make_location(self.noisy_lat, self.noisy_lon, self.absolute_altitude_msl)
             )
             extra_attributes["opticalAttributes"] = {
                 "spectrumChannel": constants.SPECTRUM_LWIR_THERMAL,
@@ -369,9 +366,9 @@ class DetectionReportBuilder:
             solar_elevation = calculate_solar_elevation(
                 sensor.lat, sensor.lon, self.current_sim_time
             )
-            rep_dict["objectId"] = f"CAM-{s_code}_{pfx}_{wave.id_suffix}"
-            rep_dict["location"] = make_location(
-                self.noisy_lat, self.noisy_lon, self.absolute_altitude_msl
+            report.object_id = f"CAM-{s_code}_{pfx}_{wave.id_suffix}"
+            report.location.CopyFrom(
+                make_location(self.noisy_lat, self.noisy_lon, self.absolute_altitude_msl)
             )
             if solar_elevation > thresholds["civil_twilight_elevation_deg"]:
                 extra_attributes["opticalAttributes"] = {
@@ -386,7 +383,7 @@ class DetectionReportBuilder:
                     "illuminationStatus": constants.ILLUMINATION_POOR_BLIND,
                 }
 
-        return rep_dict, extra_attributes
+        return report, extra_attributes
 
 
 def compute_noisy_position(sensor, lat, lon, dist):
@@ -407,20 +404,10 @@ def compute_noisy_position(sensor, lat, lon, dist):
     return lat, lon
 
 
-def validate_and_wrap(rep_dict, extra_attributes, sensor, ts_str, step):
-    """Validate rep_dict against the DetectionReport proto and wrap it in a sapientMessage."""
+def serialize_and_wrap(report, extra_attributes, sensor, ts_str, step):
+    """Serialize the DetectionReport proto and wrap it in a top-level sapientMessage."""
     try:
-        # Validate the STRICT core payload
-        proto_rep = detection_report_pb2.DetectionReport()
-        json_format.ParseDict(rep_dict, proto_rep, ignore_unknown_fields=False)
-        valid_rep = json_format.MessageToDict(
-            proto_rep,
-            preserving_proto_field_name=False,
-            always_print_fields_with_no_presence=True,
-        )
-
-        # Inject custom/extension attributes back into the validated payload safely
-        valid_rep.update(extra_attributes)
+        detection_report = builder.serialize_report(report, extra_attributes)
 
         # Manually stitch into the required top-level SAPIENT JSON structure
         return {
@@ -433,11 +420,11 @@ def validate_and_wrap(rep_dict, extra_attributes, sensor, ts_str, step):
                         "type": constants.NODE_TYPE_CHILD,
                     },
                 },
-                "detectionReport": valid_rep,
+                "detectionReport": detection_report,
             }
         }
     except Exception as e:
-        print(f"CRITICAL PROTOC VALIDATION ERROR at step {step}: {e}")
+        print(f"CRITICAL PROTOC SERIALIZATION ERROR at step {step}: {e}")
         raise
 
 
@@ -480,7 +467,7 @@ def generate_detection_for_sensor(
 
     is_diving = is_final_leg and wave.classification != constants.CLASSIFICATION_DECOY
 
-    builder = DetectionReportBuilder(
+    report_builder = DetectionReportBuilder(
         sensor,
         wave,
         thresholds,
@@ -496,8 +483,8 @@ def generate_detection_for_sensor(
         calculated_conf=calculated_conf,
         current_sim_time=current_sim_time,
     )
-    rep_dict, extra_attributes = builder.build()
-    return validate_and_wrap(rep_dict, extra_attributes, sensor, ts_str, step)
+    report, extra_attributes = report_builder.build()
+    return serialize_and_wrap(report, extra_attributes, sensor, ts_str, step)
 
 
 def generate_detections_for_sensor(sensor, waves, scenario, meta, thresholds, start_dt, duration):

@@ -442,11 +442,11 @@ def test_main_proto_validation_error(tmp_path, monkeypatch, capsys):
     def boom(*args, **kwargs):
         raise ValueError("bad proto")
 
-    monkeypatch.setattr(g.json_format, "ParseDict", boom)
+    monkeypatch.setattr(g.builder, "serialize_report", boom)
     monkeypatch.setattr("sys.argv", ["g", "--scenario", str(scen), "--output", str(out)])
     with pytest.raises(ValueError, match="bad proto"):
         g.main()
-    assert "CRITICAL PROTOC VALIDATION ERROR" in capsys.readouterr().out
+    assert "CRITICAL PROTOC SERIALIZATION ERROR" in capsys.readouterr().out
 
 
 def test_main_seed_forwarded_to_seed_all(tmp_path, monkeypatch):
@@ -646,9 +646,9 @@ def test_detection_report_builder_swarm_branch():
         calculated_conf=0.8,
         current_sim_time=datetime(2026, 1, 1),
     )
-    rep_dict, extra = builder.build()
-    assert "-SWM-" in rep_dict["objectId"]
-    assert "location" in rep_dict
+    report, extra = builder.build()
+    assert "-SWM-" in report.object_id
+    assert report.HasField("location")
     assert extra["measuredAttributes"]["estimatedSwarmCount"] == wave.count
     assert extra["measuredAttributes"]["tacticalState"] == "TERMINAL_DIVE"
 
@@ -673,9 +673,9 @@ def test_detection_report_builder_micro_doppler_fpv_diving_branch():
         calculated_conf=0.8,
         current_sim_time=datetime(2026, 1, 1),
     )
-    rep_dict, extra = builder.build()
-    assert "-IND-" in rep_dict["objectId"]
-    assert "enuVelocity" in rep_dict
+    report, extra = builder.build()
+    assert "-IND-" in report.object_id
+    assert report.HasField("enu_velocity")
     assert extra["measuredAttributes"]["microDopplerRotorSpeedRps"] == 220.0
     assert extra["measuredAttributes"]["maneuverState"] == "HIGH_G_DIVE"
 
@@ -700,6 +700,6 @@ def test_detection_report_builder_acoustic_branch():
         calculated_conf=0.8,
         current_sim_time=datetime(2026, 1, 1),
     )
-    rep_dict, _extra = builder.build()
-    assert rep_dict["objectId"].startswith("ACU-")
-    assert "rangeBearing" in rep_dict
+    report, _extra = builder.build()
+    assert report.object_id.startswith("ACU-")
+    assert report.HasField("range_bearing")

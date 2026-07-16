@@ -1,12 +1,36 @@
 # Copyright 2026 Lempea Edge Oy / DEFINE AI Foundry
 # SPDX-License-Identifier: Apache-2.0
 
+"""Construct BSI Flex 335 DetectionReport protos directly, without dict round-trips.
+
+Core SAPIENT fields are set on the proto message itself, so protobuf enforces field
+names, types and enum values at assembly time. Custom simulation attributes that are
+not part of the ICD (measuredAttributes, opticalAttributes, ...) live outside the proto
+and are merged into the serialized dict by `serialize_report`.
+"""
+
+from google.protobuf import json_format
+
+from sapient_msg.bsi_flex_335_v2_0 import (
+    detection_report_pb2,
+    location_pb2,
+    range_bearing_pb2,
+    velocity_pb2,
+)
 from scenario_foundry.constants import (
     SAP_COORD_LAT_LNG_DEG_M,
     SAP_DATUM_WGS84,
     SAP_RANGE_BEARING_COORD_SYSTEM,
     SAP_RANGE_BEARING_DATUM,
 )
+
+DetectionReport = detection_report_pb2.DetectionReport
+
+# Serialization options; kept in one place so every emitted report matches byte-for-byte.
+_TO_DICT_OPTS = {
+    "preserving_proto_field_name": False,
+    "always_print_fields_with_no_presence": True,
+}
 
 
 def make_location(lat, lon, elevation_m):
@@ -17,36 +41,58 @@ def make_location(lat, lon, elevation_m):
     z = altitude
     """
 
-    return {
-        "x": round(lon, 6),
-        "y": round(lat, 6),
-        "z": round(elevation_m, 1),
-        "coordinateSystem": SAP_COORD_LAT_LNG_DEG_M,
-        "datum": SAP_DATUM_WGS84,
-    }
+    return location_pb2.Location(
+        x=round(lon, 6),
+        y=round(lat, 6),
+        z=round(elevation_m, 1),
+        coordinate_system=location_pb2.LocationCoordinateSystem.Value(SAP_COORD_LAT_LNG_DEG_M),
+        datum=location_pb2.LocationDatum.Value(SAP_DATUM_WGS84),
+    )
 
 
 def make_velocity(east, north, up=0.0, east_error=1.0, north_error=1.0, up_error=0.5):
 
-    return {
-        "eastRate": round(east, 1),
-        "northRate": round(north, 1),
-        "upRate": round(up, 1),
-        "eastRateError": round(east_error, 1),
-        "northRateError": round(north_error, 1),
-        "upRateError": round(up_error, 1),
-    }
+    return velocity_pb2.ENUVelocity(
+        east_rate=round(east, 1),
+        north_rate=round(north, 1),
+        up_rate=round(up, 1),
+        east_rate_error=round(east_error, 1),
+        north_rate_error=round(north_error, 1),
+        up_rate_error=round(up_error, 1),
+    )
 
 
 def make_range_bearing(azimuth, distance, elevation=0.0):
 
-    return {
-        "azimuth": round(azimuth, 1),
-        "range": round(distance, 1),
-        "elevation": round(elevation, 1),
-        "azimuthError": 3.5,
-        "rangeError": 50.0,
-        "elevationError": 5.0,
-        "coordinateSystem": SAP_RANGE_BEARING_COORD_SYSTEM,
-        "datum": SAP_RANGE_BEARING_DATUM,
-    }
+    return range_bearing_pb2.RangeBearing(
+        azimuth=round(azimuth, 1),
+        range=round(distance, 1),
+        elevation=round(elevation, 1),
+        azimuth_error=3.5,
+        range_error=50.0,
+        elevation_error=5.0,
+        coordinate_system=range_bearing_pb2.RangeBearingCoordinateSystem.Value(
+            SAP_RANGE_BEARING_COORD_SYSTEM
+        ),
+        datum=range_bearing_pb2.RangeBearingDatum.Value(SAP_RANGE_BEARING_DATUM),
+    )
+
+
+def add_classification(report, class_type, confidence):
+    """Append one classification entry to a DetectionReport."""
+    entry = report.classification.add()
+    entry.type = class_type
+    entry.confidence = confidence
+    return entry
+
+
+def serialize_report(report, extra_attributes=None):
+    """Serialize a DetectionReport proto to its SAPIENT camelCase dict.
+
+    Non-ICD simulation attributes (measuredAttributes, opticalAttributes, ...) are merged
+    in after serialization since they have no place in the strict proto schema.
+    """
+    payload = json_format.MessageToDict(report, **_TO_DICT_OPTS)
+    if extra_attributes:
+        payload.update(extra_attributes)
+    return payload
