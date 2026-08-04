@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from scenario_foundry import config
+from scenario_foundry import config, constants
 from scenario_foundry.validation import validate as v
 
 SCHEMA_PATH = config.SCHEMA_DIR / "scenario.schema.json"
@@ -150,13 +150,51 @@ def test_validate_threat_profiles_valid_top_level_invalid_child_rejected():
 
 
 def _sensor(**overrides):
-    base = {"id": "S1", "lat": 62.0, "lon": 29.0, "range_m": 1000, "update_rate_sec": 10}
+    base = {
+        "id": "S1",
+        "type": "RADAR_TACTICAL",
+        "lat": 62.0,
+        "lon": 29.0,
+        "range_m": 1000,
+        "update_rate_sec": 10,
+    }
     base.update(overrides)
     return base
 
 
 def test_validate_sensor_network_ok():
     v.validate_sensor_network([_sensor(), _sensor(id="S2")])
+
+
+@pytest.mark.parametrize("sensor_type", [t.value for t in constants.SensorType])
+def test_validate_sensor_network_accepts_every_known_type(sensor_type):
+    v.validate_sensor_network([_sensor(type=sensor_type)])
+
+
+def test_validate_sensor_network_unknown_type():
+    with pytest.raises(v.ScenarioValidationError, match="unknown sensor type") as excinfo:
+        v.validate_sensor_network([_sensor(type="ELINT_PASSIVE")])
+
+    message = str(excinfo.value)
+    assert "S1" in message
+    assert "ELINT_PASSIVE" in message
+    # The point of the guard is that the bad name looked plausible: list the real ones.
+    for sensor_type in constants.SensorType:
+        assert sensor_type.value in message
+
+
+def test_schema_rejects_unknown_sensor_type():
+    scenario = v.load_json(JOENSUU_PATH)
+    scenario["sensor_network"][0]["type"] = "ELINT_PASSIVE"
+    with pytest.raises(v.ScenarioValidationError, match="Schema validation failed"):
+        v.validate_schema(scenario, SCHEMA_PATH)
+
+
+def test_schema_sensor_type_enum_matches_constants():
+    # The schema duplicates the enum for editor completion; keep the copies in step.
+    schema = v.load_json(SCHEMA_PATH)
+    schema_types = schema["properties"]["sensor_network"]["items"]["properties"]["type"]["enum"]
+    assert set(schema_types) == {t.value for t in constants.SensorType}
 
 
 def test_validate_sensor_network_duplicate_id():

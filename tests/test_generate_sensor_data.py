@@ -449,6 +449,20 @@ def test_main_night_run(tmp_path, monkeypatch):
     assert "POOR_BLIND" in _optical_statuses(msgs)
 
 
+def test_every_generated_report_carries_a_position(tmp_path, monkeypatch):
+    # A report without location or rangeBearing is unusable downstream, so the
+    # stream must never contain one.
+    msgs = _run_main(tmp_path, "2026-11-15T02:45:00Z", monkeypatch)
+    assert msgs
+    positionless = [
+        m
+        for m in msgs
+        if "location" not in (r := m["sapientMessage"]["detectionReport"])
+        and "rangeBearing" not in r
+    ]
+    assert positionless == []
+
+
 def test_main_day_run(tmp_path, monkeypatch):
     msgs = _run_main(tmp_path, "2026-06-21T10:00:00Z", monkeypatch)
     assert "OPTIMAL" in _optical_statuses(msgs)
@@ -762,6 +776,47 @@ def test_detection_report_builder_acoustic_branch():
     assert report.HasField("range_bearing")
 
 
+def _payload_less_builder(sensor_type):
+    """A detection inside sensor range but past every payload branch's own threshold."""
+    sensor = g.Sensor(id="THERM-1", type=sensor_type, lat=62.50, lon=29.70, range_m=20000)
+    return g.DetectionReportBuilder(
+        sensor,
+        _wave_obj("SW_dive", "DIVE", count=8, classification=["UAV_Kamikaze"]),
+        constants.resolve_detection_thresholds({}),
+        lat=62.58,
+        lon=29.70,
+        noisy_lat=62.58,
+        noisy_lon=29.70,
+        absolute_altitude_msl=200.0,
+        dist=9000.0,
+        mps=5.5,
+        brg=45.0,
+        is_diving=False,
+        calculated_conf=0.8,
+        current_sim_time=datetime(2026, 1, 1),
+    )
+
+
+def test_detection_report_builder_returns_none_beyond_camera_threshold():
+    assert _payload_less_builder(constants.SensorType.THERMAL_CAM).build() is None
+
+
+def test_detection_report_builder_unknown_sensor_type_raises():
+    with pytest.raises(ValueError, match="no detection payload branch"):
+        _payload_less_builder("ELINT_PASSIVE").build()
+
+
+def test_detection_report_builder_unhandled_known_sensor_type_raises(monkeypatch):
+    # A SensorType member the builder forgot is a bug, not a scenario condition.
+    monkeypatch.setattr(g, "PAYLOAD_SENSOR_TYPES", frozenset())
+    with pytest.raises(ValueError, match="THERMAL_CAM"):
+        _payload_less_builder(constants.SensorType.THERMAL_CAM).build()
+
+
+def test_payload_sensor_types_covers_every_sensor_type():
+    assert {t.value for t in constants.SensorType} == g.PAYLOAD_SENSOR_TYPES
+
+
 # --- generate_detection_for_sensor() terminal descent ---
 def _final_leg_detection(monkeypatch, *, terminal_dive):
     """One micro-doppler detection halfway along a single-leg route, at ground level 0 m."""
@@ -790,6 +845,40 @@ def _final_leg_detection(monkeypatch, *, terminal_dive):
         0,
     )
     return entry["sapientMessage"]["detectionReport"]
+
+
+def _thermal_detection(monkeypatch, thermal_cam_max_range_m):
+    """One thermal-cam detection ~10 km out: inside sensor range, past the camera default."""
+    monkeypatch.setattr(g, "read_elevation_from_local_asc", lambda *a, **k: 0.0)
+    wave = g.ThreatWave(
+        wave_id="SW_dive",
+        id_suffix="DIVE",
+        count=8,
+        speed_kmh=360,
+        alt_m=1000,
+        classification=["UAV_Kamikaze"],
+        launch_delay_sec=0,
+        waypoints=g.parse_wkt("LINESTRING (29.70 62.60, 29.70 62.59)"),
+        terminal_dive=False,
+        rotor_speed_rps=constants.ROTOR_SPEED_DEFAULT_RPS,
+    )
+    sensor = g.Sensor(id="THERM-1", type="THERMAL_CAM", lat=62.50, lon=29.70, range_m=20000)
+    thresholds = constants.resolve_detection_thresholds(
+        {"detection_thresholds": {"thermal_cam_max_range_m": thermal_cam_max_range_m}}
+    )
+    return g.generate_detection_for_sensor(
+        sensor, wave, 6.0, datetime(2026, 1, 1), "2026-01-01T00:00:00Z", {}, thresholds, 0
+    )
+
+
+def test_detection_without_payload_yields_no_message(monkeypatch):
+    assert _thermal_detection(monkeypatch, 4000.0) is None
+
+
+def test_same_detection_inside_camera_threshold_is_emitted(monkeypatch):
+    # Same geometry, threshold raised past it: proves the drop is the threshold's doing.
+    entry = _thermal_detection(monkeypatch, 20000.0)
+    assert "location" in entry["sapientMessage"]["detectionReport"]
 
 
 def test_terminal_dive_descends_on_final_leg(monkeypatch):
