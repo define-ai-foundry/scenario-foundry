@@ -79,7 +79,7 @@ def export_flight_vectors(tactical_data, output_dir, sample_rate):
             writer.writerow(
                 [
                     profile_id,
-                    profile.get("classification", "UNKNOWN"),
+                    " > ".join(profile.get("classification", ["UNKNOWN"])),
                     profile.get("target", "UNKNOWN"),
                     profile.get("speed_kmh", 0),
                     int(profile.get("alt_m", 0)),
@@ -120,6 +120,25 @@ def export_sensor_network(tactical_data, output_dir):
     print(f"[SUCCESS] Exported Sensor Network Layer: {output_path}")
 
 
+def classification_path_and_confidence(class_list):
+    """Join a DetectionReportClassification's type + nested SubClass types into one readable path.
+
+    Confidence is only ever set on the top-level entry (sub-classes carry none in this
+    pipeline), so it is read from `class_list[0]` alone.
+    """
+    if not class_list:
+        return "UNKNOWN", 0.0
+
+    top = class_list[0]
+    parts = [top.get("type", "UNKNOWN")]
+    node = top
+    while node.get("subClass"):
+        node = node["subClass"][0]
+        parts.append(node.get("type", "UNKNOWN"))
+
+    return " > ".join(parts), top.get("confidence", 0.0)
+
+
 def export_sensor_detections(messages_data, output_dir):
     """Flattens Flex 335 SAPIENT sensor data messages into a dynamic layer."""
 
@@ -148,16 +167,10 @@ def export_sensor_detections(messages_data, output_dir):
 
             report = msg.get("detectionReport", {})
 
-            # Classification
-            class_list = report.get("classification", [])
-
-            drone_type = "UNKNOWN"
-            confidence = 0.0
-
-            if class_list:
-                drone_type = class_list[0].get("type", "UNKNOWN")
-
-                confidence = class_list[0].get("confidence", 0.0)
+            # Classification: full type > sub_class > sub_class... path, one readable cell
+            drone_type, confidence = classification_path_and_confidence(
+                report.get("classification", [])
+            )
 
             # Flex 335 Location
             location = report.get("location", {})

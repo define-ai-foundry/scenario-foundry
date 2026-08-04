@@ -54,12 +54,33 @@ def test_make_range_bearing_custom_elevation():
     assert rb.elevation == 45.7
 
 
-def test_add_classification_appends_entry():
+def test_add_classification_single_level_has_no_sub_class():
     report = builder.DetectionReport()
-    entry = builder.add_classification(report, "UAV_KAMIKAZE", 0.83)
+    entry = builder.add_classification(report, ["UAV_KAMIKAZE"], 0.83)
     assert len(report.classification) == 1
     assert entry.type == "UAV_KAMIKAZE"
     assert entry.confidence == pytest.approx(0.83, abs=1e-6)
+    assert len(entry.sub_class) == 0
+
+
+def test_add_classification_three_levels_nest_recursively():
+    report = builder.DetectionReport()
+    entry = builder.add_classification(report, ["Air vehicle", "UAV rotary wing", "Military"], 0.83)
+    assert entry.type == "Air vehicle"
+    assert entry.confidence == pytest.approx(0.83, abs=1e-6)
+    assert len(entry.sub_class) == 1
+
+    level1 = entry.sub_class[0]
+    assert level1.type == "UAV rotary wing"
+    assert level1.level == 1
+    assert level1.HasField("confidence") is False
+    assert len(level1.sub_class) == 1
+
+    level2 = level1.sub_class[0]
+    assert level2.type == "Military"
+    assert level2.level == 2
+    assert level2.HasField("confidence") is False
+    assert len(level2.sub_class) == 0
 
 
 def test_add_object_info_appends_entry():
