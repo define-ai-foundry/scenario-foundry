@@ -193,6 +193,21 @@ def test_export_sensor_detections_full_and_defaults(tmp_path):
     assert rows[2]["Latitude"] == ""
 
 
+# --- scenario_output_dir ---
+def test_scenario_output_dir_prefers_location():
+    assert es.scenario_output_dir("/out", "/data/joensuu_tactical.json", "alakurtti") == (
+        "/out/alakurtti"
+    )
+
+
+def test_scenario_output_dir_strips_tactical_suffix():
+    assert es.scenario_output_dir("/out", "/data/joensuu_tactical.json") == "/out/joensuu"
+
+
+def test_scenario_output_dir_plain_stem():
+    assert es.scenario_output_dir("/out", "/data/joensuu.json") == "/out/joensuu"
+
+
 # --- resolve_input ---
 def test_resolve_input_absolute_json(tmp_path):
     p = tmp_path / "scen.json"
@@ -218,10 +233,18 @@ def test_resolve_input_returns_none(tmp_path):
 
 
 # --- main ---
-def _write_inputs(tmp_path):
-    scen = tmp_path / "scen_tactical.json"
+LAYER_FILES = [
+    "targets_layer.csv",
+    "flight_vectors_layer.csv",
+    "sensor_network_layer.csv",
+    "sensor_detections_layer.csv",
+]
+
+
+def _write_inputs(tmp_path, name="scen"):
+    scen = tmp_path / f"{name}_tactical.json"
     scen.write_text(json.dumps(_tactical()), encoding="utf-8")
-    msgs = tmp_path / "scen_messages.json"
+    msgs = tmp_path / f"{name}_messages.json"
     msgs.write_text(json.dumps([{"sapientMessage": {"detectionReport": {}}}]), encoding="utf-8")
     return scen, msgs
 
@@ -242,13 +265,10 @@ def test_main_happy_path(tmp_path, monkeypatch, capsys):
         ],
     )
     es.main()
-    for name in [
-        "targets_layer.csv",
-        "flight_vectors_layer.csv",
-        "sensor_network_layer.csv",
-        "sensor_detections_layer.csv",
-    ]:
-        assert (outdir / name).exists()
+    # layers land in a subdirectory named after the tactical file stem, not in --outdir itself
+    for name in LAYER_FILES:
+        assert (outdir / "scen" / name).exists()
+        assert not (outdir / name).exists()
     assert "All layers built" in capsys.readouterr().out
 
 
@@ -262,7 +282,38 @@ def test_main_location(tmp_path, monkeypatch):
         "sys.argv", ["export_scenario.py", "--location", "scen", "--outdir", str(outdir)]
     )
     es.main()
-    assert (outdir / "targets_layer.csv").exists()
+    assert (outdir / "scen" / "targets_layer.csv").exists()
+
+
+def test_main_two_scenarios_do_not_collide(tmp_path, monkeypatch):
+    _write_inputs(tmp_path, "joensuu")
+    _write_inputs(tmp_path, "alakurtti")
+    monkeypatch.setattr(es, "TACTICAL_DIR", str(tmp_path))
+    monkeypatch.setattr(es, "MESSAGES_DIR", str(tmp_path))
+    outdir = tmp_path / "out"
+
+    monkeypatch.setattr(
+        "sys.argv", ["export_scenario.py", "--location", "joensuu", "--outdir", str(outdir)]
+    )
+    es.main()
+    # second run resolves inputs from the filename stem instead of --location
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "export_scenario.py",
+            "--scenario",
+            str(tmp_path / "alakurtti_tactical.json"),
+            "--messages",
+            str(tmp_path / "alakurtti_messages.json"),
+            "--outdir",
+            str(outdir),
+        ],
+    )
+    es.main()
+
+    assert sorted(p.name for p in outdir.iterdir()) == ["alakurtti", "joensuu"]
+    for scenario in ["joensuu", "alakurtti"]:
+        assert sorted(p.name for p in (outdir / scenario).iterdir()) == sorted(LAYER_FILES)
 
 
 def test_main_unresolved_scenario(tmp_path, monkeypatch):

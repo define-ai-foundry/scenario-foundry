@@ -82,6 +82,7 @@ scenario-foundry/
 │     └─ scenario.schema.json
 ├─ data/
 │  ├─ export_output/
+│  │  └─ joensuu/
 │  ├─ generated_output/
 │  ├─ tactical_scenarios/
 │  └─ terrain/
@@ -174,13 +175,15 @@ OR
 python -m src.scenario_foundry.export_scenario --location joensuu
 ```
 
+The layers are written to a per-scenario subdirectory of `--outdir` — `data/export_output/joensuu/` for the commands above — so exporting several scenarios never overwrites earlier results. The subdirectory is named after `--location`, or after the tactical file name when only `--scenario` is given.
+
 ## Geospatial Layer Visualization
 
 Once exported, you can visualize your tactical layers on Google My Maps or standard GIS tools (QGIS, ArcGIS):
 
 - Open Google My Maps and create a new custom map.
 
-- For each generated CSV layer inside data/export_output/, click Add Layer and select Import:
+- For each generated CSV layer inside `data/export_output/<scenario>/`, click Add Layer and select Import:
 
 | Layer Source CSV | Spatial Column Selection | Label / Title Column | Visual Styling Tips |
 | :--- | :--- | :--- | :--- |

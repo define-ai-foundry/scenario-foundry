@@ -199,6 +199,17 @@ def export_sensor_detections(messages_data, output_dir):
     print(f"[SUCCESS] Exported Sensor Detections Layer: {output_path}")
 
 
+#  --- OUTPUT RESOLVER ---
+def scenario_output_dir(outdir, scenario_path, location=None):
+    """Per-scenario subdirectory of `outdir`, so exporting one scenario never overwrites another.
+
+    Named after `location` when given, otherwise after the tactical file stem with
+    its `_tactical` suffix stripped (`joensuu_tactical.json` -> `joensuu`).
+    """
+    name = location or Path(scenario_path).stem.removesuffix("_tactical")
+    return os.path.join(outdir, name)
+
+
 #  --- INPUT RESOLVER ---
 def resolve_input(value, directory, suffix, location=None):
     if value:
@@ -242,7 +253,9 @@ def main():
         help="Optional location name for resolving input paths (e.g., 'joensuu')",
     )
     parser.add_argument(
-        "--outdir", default=OUTPUT_DIR, help="Output directory for generated GIS layers"
+        "--outdir",
+        default=OUTPUT_DIR,
+        help="Parent directory holding the per-scenario subdirectory of generated GIS layers",
     )
     parser.add_argument(
         "--sample-rate",
@@ -252,7 +265,6 @@ def main():
     )
 
     args = parser.parse_args()
-    os.makedirs(args.outdir, exist_ok=True)
 
     # Resolve input paths for scenario and messages using the provided arguments and resolution logic
     args.scenario = resolve_input(args.scenario, TACTICAL_DIR, "_tactical.json", args.location)
@@ -264,6 +276,10 @@ def main():
 
     if not args.messages:
         raise FileNotFoundError("Could not resolve messages file")
+
+    # Keep each scenario's layers in their own subdirectory of --outdir
+    output_dir = scenario_output_dir(args.outdir, args.scenario, args.location)
+    os.makedirs(output_dir, exist_ok=True)
 
     # Load the tactical environment profile and the simulated SAPIENT message stream
     try:
@@ -282,12 +298,12 @@ def main():
 
     # Generate and export GIS layers for targets, flight vectors, sensor network, and sensor detections with clear logging
     print("=" * 65)
-    print(" Compiling GIS Layers for Export Pipeline...")
+    print(f" Compiling GIS Layers for Export Pipeline into {output_dir}...")
     print("=" * 65)
-    export_targets(tactical_data, args.outdir)
-    export_flight_vectors(tactical_data, args.outdir, args.sample_rate)
-    export_sensor_network(tactical_data, args.outdir)
-    export_sensor_detections(messages_data, args.outdir)
+    export_targets(tactical_data, output_dir)
+    export_flight_vectors(tactical_data, output_dir, args.sample_rate)
+    export_sensor_network(tactical_data, output_dir)
+    export_sensor_detections(messages_data, output_dir)
     print("=" * 65)
     print("All layers built and formatted perfectly.")
 
