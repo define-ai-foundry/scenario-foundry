@@ -1,0 +1,128 @@
+{
+  "scenario_meta": {
+    "name": "Alakurtti-Lapland Multi-Vector Simulation Scenario",
+    "start_time_iso": "2026-11-15T03:00:00Z",
+    "duration_seconds": 4500,
+    "time_step_seconds": 20
+  },
+  "targets": {
+    "SALLA_RADAR_COMM": {
+      "lat": 66.8250,
+      "lon": 28.8450,
+      "alt": 420.0
+    },
+    "KEMIJARVI_LOGISTICS_HUB": {
+      "lat": 66.7141,
+      "lon": 27.4306,
+      "alt": 145.0
+    },
+    "ROVANIEMI_AIR_BASE": {
+      "lat": 66.5617,
+      "lon": 25.8369,
+      "alt": 196.0
+    }
+  },
+  "threat_profiles": {
+    "V1_ISKANDER_MISSILE": {
+      "count": 4,
+      "speed_kmh": 3000,
+      "alt_m": 15000.0,
+      "classification": ["Equipment", "Weapon", "Missile"],
+      "launch_delay_sec": 0,
+      "id_suffix": "MISSILE",
+      "wkt_linestring": "LINESTRING (30.3821 66.9594, 25.8369 66.5617)"
+    },
+    "V2_GERAN_DRONE_SWARM": {
+      "count": 12,
+      "speed_kmh": 180,
+      "alt_m": 120.0,
+      "classification": ["Air vehicle", "UAV fixed wing", "Military"],
+      "launch_delay_sec": 45,
+      "id_suffix": "DRONE",
+      "wkt_linestring": "LINESTRING (30.3821 66.9594, 28.8450 66.8250)"
+    },
+    "V3_ARCTIC_HELI_ASSAULT": {
+      "count": 6,
+      "speed_kmh": 220,
+      "alt_m": 50.0,
+      "classification": ["Air vehicle", "Manned rotary wing", "Military"],
+      "launch_delay_sec": 120,
+      "id_suffix": "HELI",
+      "wkt_linestring": "LINESTRING (30.3821 66.9594, 27.4306 66.7141)"
+    }
+  },
+  "sensor_network": [
+    {
+      "id": "FI-MIL-RAD-LUOSTO-01",
+      "type": "RADAR_STRATEGIC",
+      "lat": 67.1333,
+      "lon": 26.8833,
+      "range_m": 180000,
+      "update_rate_sec": 15.0
+    },
+    {
+      "id": "FI-MIL-RAD-KAAMANEN-02",
+      "type": "RADAR_STRATEGIC",
+      "lat": 69.1333,
+      "lon": 27.0333,
+      "range_m": 200000,
+      "update_rate_sec": 20.0
+    },
+    {
+      "id": "FI-MIL-ELINT-SALLA-01",
+      "type": "ELINT_PASSIVE",
+      "lat": 67.0500,
+      "lon": 28.5000,
+      "range_m": 60000,
+      "update_rate_sec": 5.0
+    },
+    {
+      "id": "FI-BOR-EOIR-SALLABORDER-01",
+      "type": "THERMAL_CAM",
+      "lat": 66.7618,
+      "lon": 28.7847,
+      "range_m": 10000,
+      "update_rate_sec": 10.0
+    },
+    {
+      "id": "FI-METEO-RADAR-SODANKYLA",
+      "type": "WEATHER_RADAR_DUAL_USE",
+      "lat": 67.3580,
+      "lon": 26.6330,
+      "range_m": 120000,
+      "update_rate_sec": 30.0
+    }
+  ],
+  "terrain_elevation_anchors": [
+    {
+      "name": "Alakurtti Launch Base Anchor",
+      "lat": 67.12,
+      "lon": 32.45,
+      "elevation_msl": 162.0
+    },
+    {
+      "name": "Sallatunturi Peak Node",
+      "lat": 66.82,
+      "lon": 28.84,
+      "elevation_msl": 418.0
+    },
+    {
+      "name": "Kemijarvi Basin Flat",
+      "lat": 66.71,
+      "lon": 27.43,
+      "elevation_msl": 142.0
+    },
+    {
+      "name": "Luostotunturi Radar Node",
+      "lat": 67.13,
+      "lon": 26.88,
+      "elevation_msl": 514.0
+    },
+    {
+      "name": "Rovaniemi Airbase Basin",
+      "lat": 66.56,
+      "lon": 25.83,
+      "elevation_msl": 195.0
+    }
+  ]
+}
