@@ -1,5 +1,7 @@
 """Tests for scenario_foundry.validation.validate."""
 
+import json
+
 import pytest
 
 from scenario_foundry import config
@@ -8,12 +10,16 @@ from scenario_foundry.validation import validate as v
 SCHEMA_PATH = config.SCHEMA_DIR / "scenario.schema.json"
 JOENSUU_PATH = config.SCENARIOS_DIR / "joensuu.json"
 
+TAXONOMY = v.load_taxonomy()
+VALID_PATHS = v.taxonomy_classification_paths(TAXONOMY)
+
 
 def _threat(**overrides):
     base = {
         "count": 5,
         "speed_kmh": 100,
         "alt_m": 50.0,
+        "classification": ["Air vehicle", "UAV rotary wing", "Military"],
         "wkt_linestring": "LINESTRING (30.0 62.0, 30.1 62.1)",
     }
     base.update(overrides)
@@ -88,37 +94,59 @@ def test_validate_targets_negative_alt():
 
 
 def test_validate_threat_profiles_ok():
-    v.validate_threat_profiles({"W1": _threat()})
+    v.validate_threat_profiles({"W1": _threat()}, VALID_PATHS)
 
 
 def test_validate_threat_profiles_bad_count():
     with pytest.raises(v.ScenarioValidationError, match="count must be positive"):
-        v.validate_threat_profiles({"W1": _threat(count=0)})
+        v.validate_threat_profiles({"W1": _threat(count=0)}, VALID_PATHS)
 
 
 def test_validate_threat_profiles_bad_speed():
     with pytest.raises(v.ScenarioValidationError, match="speed must be positive"):
-        v.validate_threat_profiles({"W1": _threat(speed_kmh=0)})
+        v.validate_threat_profiles({"W1": _threat(speed_kmh=0)}, VALID_PATHS)
 
 
 def test_validate_threat_profiles_negative_alt():
     with pytest.raises(v.ScenarioValidationError, match="negative altitude"):
-        v.validate_threat_profiles({"W1": _threat(alt_m=-1.0)})
+        v.validate_threat_profiles({"W1": _threat(alt_m=-1.0)}, VALID_PATHS)
 
 
 def test_validate_threat_profiles_unparseable_wkt():
     with pytest.raises(v.ScenarioValidationError, match="invalid WKT LineString"):
-        v.validate_threat_profiles({"W1": _threat(wkt_linestring="NOT WKT AT ALL")})
+        v.validate_threat_profiles({"W1": _threat(wkt_linestring="NOT WKT AT ALL")}, VALID_PATHS)
 
 
 def test_validate_threat_profiles_not_linestring():
     with pytest.raises(v.ScenarioValidationError, match="must be LineString"):
-        v.validate_threat_profiles({"W1": _threat(wkt_linestring="POINT (1 2)")})
+        v.validate_threat_profiles({"W1": _threat(wkt_linestring="POINT (1 2)")}, VALID_PATHS)
 
 
 def test_validate_threat_profiles_too_few_points():
     with pytest.raises(v.ScenarioValidationError, match="at least two points"):
-        v.validate_threat_profiles({"W1": _threat(wkt_linestring="LINESTRING EMPTY")})
+        v.validate_threat_profiles({"W1": _threat(wkt_linestring="LINESTRING EMPTY")}, VALID_PATHS)
+
+
+def test_validate_threat_profiles_level3_path_accepted():
+    v.validate_threat_profiles(
+        {"W1": _threat(classification=["Equipment", "Weapon", "Missile"])}, VALID_PATHS
+    )
+
+
+def test_validate_threat_profiles_partial_path_accepted():
+    v.validate_threat_profiles({"W1": _threat(classification=["Air vehicle"])}, VALID_PATHS)
+
+
+def test_validate_threat_profiles_unknown_top_level_rejected():
+    with pytest.raises(v.ScenarioValidationError, match="unknown classification path"):
+        v.validate_threat_profiles({"W1": _threat(classification=["Spaceship"])}, VALID_PATHS)
+
+
+def test_validate_threat_profiles_valid_top_level_invalid_child_rejected():
+    with pytest.raises(v.ScenarioValidationError, match="unknown classification path"):
+        v.validate_threat_profiles(
+            {"W1": _threat(classification=["Air vehicle", "Submarine"])}, VALID_PATHS
+        )
 
 
 def _sensor(**overrides):
@@ -157,6 +185,45 @@ def test_validate_terrain_bad():
 
 def test_validate_scenario_full():
     assert v.validate_scenario(JOENSUU_PATH, SCHEMA_PATH) is True
+
+
+def test_validate_scenario_bad_classification(tmp_path):
+    scenario = v.load_json(JOENSUU_PATH)
+    scenario["threat_profiles"]["W1_DECOY"]["classification"] = ["Not a real class"]
+    bad_path = tmp_path / "bad.json"
+    bad_path.write_text(json.dumps(scenario), encoding="utf-8")
+
+    with pytest.raises(v.ScenarioValidationError, match="unknown classification path"):
+        v.validate_scenario(bad_path, SCHEMA_PATH)
+
+
+def test_load_taxonomy_default_version():
+    taxonomy = v.load_taxonomy()
+    assert "classifications" in taxonomy
+
+
+def test_load_taxonomy_missing_file_raises_real_error(monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "SCHEMA_DIR", tmp_path)
+    with pytest.raises(FileNotFoundError):
+        v.load_taxonomy(version="does_not_exist")
+
+
+def test_taxonomy_classification_paths_includes_all_three_levels():
+    assert ("Equipment", "Weapon", "Missile") in VALID_PATHS
+    assert ("Air vehicle", "Manned rotary wing", "Military") in VALID_PATHS
+    assert ("Equipment", "Weapon") in VALID_PATHS
+    assert ("Equipment",) in VALID_PATHS
+
+
+def test_taxonomy_classification_paths_keeps_repeated_other_distinct():
+    assert ("Land vehicle", "Other") in VALID_PATHS
+    assert ("Sea vessel", "Other") in VALID_PATHS
+    # "Other" under Equipment resolves via the level-2 dict (empty leaf list),
+    # so only the level-2 path exists, not a level-3 leaf under it.
+    assert ("Equipment", "Other") in VALID_PATHS
+    assert ("Equipment", "Other", "Other") not in VALID_PATHS
+    # top-level "Other" is its own path, distinct from any nested "Other".
+    assert ("Other",) in VALID_PATHS
 
 
 def test_main_location(monkeypatch):

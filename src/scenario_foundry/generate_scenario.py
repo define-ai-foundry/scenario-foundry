@@ -13,6 +13,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 from scenario_foundry.generation.fetch_terrain import main as run_fetch_terrain
 from scenario_foundry.generation.generate_sensor_data import main as run_generate_sensor_data
 from scenario_foundry.generation.optimize_vectors import main as run_optimize_vectors
+from scenario_foundry.validation.validate import ScenarioValidationError, validate_scenario
 
 
 def main():
@@ -40,13 +41,22 @@ def main():
     coarse_scenario_path = config.SCENARIOS_DIR / args.scenario
     if not coarse_scenario_path.exists():
         print(f"[ERROR] Scenario configuration file not found at: {coarse_scenario_path}")
-        return
+        sys.exit(1)
 
     scenario_name = coarse_scenario_path.stem  # Extracts e.g., "joensuu"
 
     print("=" * 80)
     print(f"LAUNCHING SAPIENT GENERATION PIPELINE: {scenario_name.upper()}")
     print("=" * 80)
+
+    # STEP 0: Validate the scenario against its schema and the SAPIENT taxonomy
+    print("\n[VALIDATE] Checking scenario configuration against schema and taxonomy...")
+    schema_path = config.SCHEMA_DIR / "scenario.schema.json"
+    try:
+        validate_scenario(coarse_scenario_path, schema_path)
+    except ScenarioValidationError as e:
+        print(f"[ERROR] Scenario validation failed: {e}")
+        sys.exit(1)
 
     # STEP 1: Fetch Terrain Data (Downloads only if missing from local cache)
     print("\n[STEP 1/3] Verifying and fetching required terrain grid nodes...")

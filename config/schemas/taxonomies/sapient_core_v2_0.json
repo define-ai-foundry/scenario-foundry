@@ -1,0 +1,65 @@
+{
+  "version": "BSI Flex 335 v2.0:2024-03",
+  "namespace": "sapient_core",
+  "classifications": {
+    "Other": {},
+    "Human": {
+      "subclasses": ["Male", "Female"]
+    },
+    "Animal": {
+      "subclasses": ["Bird", "Horse", "Other"]
+    },
+    "Fixed object": {
+      "subclasses": ["Building", "Fixed tower/mast", "Stationary Rotator", "Road", "Bridge", "Dam", "Street furniture", "Natural feature", "Other"]
+    },
+    "EM transmitter": {
+      "subclasses": ["Wifi AP", "Broadcast", "UAS control station", "UAV transmitter", "Radar", "RF jammer", "Laser/Lidar", "RF DEW/EM pulse", "Other"]
+    },
+    "Equipment": {
+      "subclasses": {
+        "Weapon": ["Gun", "Missile launcher", "Missile", "Bomb", "IED/mine", "Grenade", "Other"],
+        "Passive sensor": ["Camera", "Acoustic", "Other"],
+        "Other": []
+      }
+    },
+    "Land vehicle": {
+      "subclasses": {
+        "Tracked": ["Commercial", "Military", "Other"],
+        ">2 wheels - Heavy": ["Commercial", "Military", "Other"],
+        ">2 wheels - Medium": ["Commercial", "Military", "Other"],
+        ">2 wheels - Light": ["Commercial", "Military", "Other"],
+        "2 wheels": ["Motorbike", "Bicycle", "Other"],
+        "Other": []
+      }
+    },
+    "Sea vessel": {
+      "subclasses": {
+        "Large ship": ["Commercial", "Military", "Other"],
+        "Small boat": ["Commercial", "Military", "Other"],
+        "Submarine": ["Commercial", "Military", "Other"],
+        "Other": []
+      }
+    },
+    "Air vehicle": {
+      "subclasses": {
+        "Manned rotary wing": ["Commercial", "Military", "Other"],
+        "Manned fixed wing": ["Commercial", "Military", "Other"],
+        "UAV rotary wing": ["Commercial", "Military", "Other"],
+        "UAV fixed wing": ["Commercial", "Military", "Other"],
+        "Other": []
+      }
+    }
+  },
+  "behaviours": [
+    "Walking",
+    "Running",
+    "Crawling",
+    "Climbing",
+    "Digging",
+    "Throwing",
+    "Loitering",
+    "Active",
+    "Passive",
+    "Other"
+  ]
+}

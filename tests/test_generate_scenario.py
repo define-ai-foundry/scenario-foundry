@@ -15,8 +15,25 @@ def spies(monkeypatch):
 
 def test_main_not_found(monkeypatch, capsys, spies):
     monkeypatch.setattr("sys.argv", ["generate_scenario.py", "--scenario", "no_such_scenario"])
-    gs.main()
+    with pytest.raises(SystemExit) as exc_info:
+        gs.main()
+    assert exc_info.value.code == 1
     assert "not found" in capsys.readouterr().out
+    assert spies == []
+
+
+def test_main_validation_failure_exits_nonzero_before_any_step(monkeypatch, capsys, spies):
+    def boom(*args, **kwargs):
+        raise gs.ScenarioValidationError("bad classification path")
+
+    monkeypatch.setattr(gs, "validate_scenario", boom)
+    monkeypatch.setattr("sys.argv", ["generate_scenario.py", "--scenario", "joensuu"])
+    with pytest.raises(SystemExit) as exc_info:
+        gs.main()
+    assert exc_info.value.code == 1
+    out = capsys.readouterr().out
+    assert "Scenario validation failed" in out
+    assert "bad classification path" in out
     assert spies == []
 
 

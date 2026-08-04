@@ -33,11 +33,49 @@ def load_json(path: str | pathlib.Path):
         return json.load(f)
 
 
-def validate_schema(config: dict, schema_path: str | pathlib.Path):
+def load_taxonomy(version: str = "v2_0") -> dict:
+    """Load the BSI Flex 335 SAPIENT core taxonomy for the given version.
+
+    Load errors are left to propagate; masking them would resurface as a
+    misleading "unknown classification path" on the first threat profile.
+    """
+    taxonomy_path = config.SCHEMA_DIR / f"taxonomies/sapient_core_{version}.json"
+    return load_json(taxonomy_path)
+
+
+def taxonomy_classification_paths(taxonomy: dict) -> set[tuple[str, ...]]:
+    """Flatten a taxonomy's `classifications` tree into the set of valid paths.
+
+    Every prefix counts, so a partially resolved class like ("Air vehicle",) is
+    valid. `subclasses` is absent, a list of level-2 names, or a dict mapping
+    level-2 names to their level-3 names.
+    """
+    paths = set()
+
+    for level1, node in taxonomy["classifications"].items():
+        paths.add((level1,))
+
+        subclasses = node.get("subclasses")
+        if subclasses is None:
+            continue
+
+        if isinstance(subclasses, dict):
+            for level2, level3_names in subclasses.items():
+                paths.add((level1, level2))
+                for level3 in level3_names:
+                    paths.add((level1, level2, level3))
+        else:
+            for level2 in subclasses:
+                paths.add((level1, level2))
+
+    return paths
+
+
+def validate_schema(scenario: dict, schema_path: str | pathlib.Path):
     schema = load_json(schema_path)
 
     try:
-        validate(instance=config, schema=schema)
+        validate(instance=scenario, schema=schema)
     except ValidationError as e:
         raise ScenarioValidationError(f"Schema validation failed: {e.message}") from e
 
@@ -75,7 +113,7 @@ def validate_targets(targets):
             raise ScenarioValidationError(f"target {name}: negative altitude")
 
 
-def validate_threat_profiles(threats):
+def validate_threat_profiles(threats, valid_classification_paths):
 
     for name, threat in threats.items():
         if threat["count"] <= 0:
@@ -86,6 +124,12 @@ def validate_threat_profiles(threats):
 
         if threat["alt_m"] < 0:
             raise ScenarioValidationError(f"{name}: negative altitude")
+
+        classification = tuple(threat["classification"])
+        if classification not in valid_classification_paths:
+            raise ScenarioValidationError(
+                f"{name}: unknown classification path {list(classification)}"
+            )
 
         try:
             geometry = wkt.loads(threat["wkt_linestring"])
@@ -127,19 +171,21 @@ def validate_terrain(anchors):
 
 def validate_scenario(scenario_path: str | pathlib.Path, schema_path: str | pathlib.Path):
 
-    config = load_json(scenario_path)
+    scenario = load_json(scenario_path)
 
-    validate_schema(config, schema_path)
+    validate_schema(scenario, schema_path)
 
-    validate_scenario_meta(config["scenario_meta"])
+    validate_scenario_meta(scenario["scenario_meta"])
 
-    validate_targets(config["targets"])
+    validate_targets(scenario["targets"])
 
-    validate_threat_profiles(config["threat_profiles"])
+    taxonomy = load_taxonomy()
+    valid_classification_paths = taxonomy_classification_paths(taxonomy)
+    validate_threat_profiles(scenario["threat_profiles"], valid_classification_paths)
 
-    validate_sensor_network(config["sensor_network"])
+    validate_sensor_network(scenario["sensor_network"])
 
-    validate_terrain(config["terrain_elevation_anchors"])
+    validate_terrain(scenario["terrain_elevation_anchors"])
 
     return True
 
