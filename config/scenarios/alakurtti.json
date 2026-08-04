@@ -69,8 +69,8 @@
       "update_rate_sec": 20.0
     },
     {
-      "id": "FI-MIL-ELINT-SALLA-01",
-      "type": "ELINT_PASSIVE",
+      "id": "FI-MIL-MRAD-SALLA-01",
+      "type": "RADAR_TACTICAL",
       "lat": 67.0500,
       "lon": 28.5000,
       "range_m": 60000,
@@ -81,12 +81,12 @@
       "type": "THERMAL_CAM",
       "lat": 66.7618,
       "lon": 28.7847,
-      "range_m": 10000,
+      "range_m": 4000,
       "update_rate_sec": 10.0
     },
     {
       "id": "FI-METEO-RADAR-SODANKYLA",
-      "type": "WEATHER_RADAR_DUAL_USE",
+      "type": "RADAR_STRATEGIC",
       "lat": 67.3580,
       "lon": 26.6330,
       "range_m": 120000,
