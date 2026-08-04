@@ -1,6 +1,6 @@
 # Scenario Configuration  Guide
 
-Every simulation is defined by a central JSON scenario file. Below is a structured documentation guide detailing all configurable parameters:
+Every simulation is defined by a central JSON scenario file. It is checked against `config/schemas/scenario.schema.json` and the SAPIENT taxonomy before every generation run, and a scenario that violates either aborts the run. Below is a structured documentation guide detailing all configurable parameters:
 
 ## 1. `scenario_meta` (Metadata & Timeline Control)
 
@@ -53,7 +53,7 @@ Defines kinematic, scheduling, and classification profiles for offensive entitie
 
 - `alt_m` (Float): Operational cruising altitude (defined as Above-Ground-Level [AGL] when terrain refinement is active).
 
-- `classification` (String): SAPIENT-compliant classification label (e.g., "UAV_Decoy", "UAV_Propeller_Kamikaze", "Personnel").
+- `classification` (Array of Strings): Ordered path through the BSI Flex 335 SAPIENT core taxonomy, from the top-level class down through its sub-classes (e.g. `["Air vehicle", "UAV fixed wing", "Military"]`). Every level name must match the taxonomy in `config/schemas/taxonomies/sapient_core_v2_0.json` exactly, and the path is emitted as the detection report classification type with each following level nested as a SubClass. Partial paths are allowed: a one-level path such as `["Air vehicle"]` is a valid, less specific classification, and levels are never inferred for you.
 
 - `launch_delay_sec` (Integer): Time-offset delay in seconds before the first entity in this profile launches.
 
@@ -61,16 +61,21 @@ Defines kinematic, scheduling, and classification profiles for offensive entitie
 
 - `wkt_linestring` (String - WKT LINESTRING): The geographic routing line representing the planned flight vector, moving from the launch coordinates to the target.
 
+- `terminal_dive` (Boolean - optional, default `true`): Whether entities descend toward the surface along the final leg of the route. Set it to `false` for entities that hold their cruise altitude all the way in, such as decoys.
+
+- `rotor_speed_rps` (Float - optional, default `75.0`): Rotor speed in revolutions per second reported as the micro-doppler signature of this profile's entities.
+
 ```json
 "threat_profiles": {
   "W2_KMS_PLANT": {
     "count": 10,
     "speed_kmh": 185,
     "alt_m": 60.0,
-    "classification": "UAV_Propeller_Kamikaze",
+    "classification": ["Air vehicle", "UAV fixed wing", "Military"],
     "launch_delay_sec": 60,
     "id_suffix": "PLANT",
-    "wkt_linestring": "LINESTRING (30.6900 62.1510, 30.2000 62.3000, 29.832561 62.594810)"
+    "wkt_linestring": "LINESTRING (30.6900 62.1510, 30.2000 62.3000, 29.832561 62.594810)",
+    "terminal_dive": true
   }
 }
 ```

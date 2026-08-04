@@ -37,7 +37,7 @@ Follow these instructions to configure, run, and export your sensor simulation s
 
 ### Prerequisites
 
-Ensure your host machine has Python 3.8+ installed. Clone this repository and install the required dependencies:
+Ensure your host machine has Python 3.10+ installed. Clone this repository and install the required dependencies:
 
 ### Clone the repository
 ```bash
@@ -47,10 +47,9 @@ cd scenario-foundry
 
 ### Install Python requirements and the project
 ```bash
-pip install -r requirements.txt
-
 pip install -e .
 ```
+The runtime dependencies are declared in `pyproject.toml` and are installed along with the project.
 
 ### Install an API key from opentopography.org
 
@@ -76,9 +75,12 @@ The workspace is organized into modular directories following standard developme
 scenario-foundry/
 ├─ config/
 │  ├─ scenarios/
+│  │  ├─ alakurtti.json
 │  │  ├─ joensuu.json
 │  │  └─ scenario_guide.md
 │  └─ schemas/
+│     ├─ taxonomies/
+│     │  └─ sapient_core_v2_0.json
 │     └─ scenario.schema.json
 ├─ data/
 │  ├─ export_output/
@@ -89,15 +91,13 @@ scenario-foundry/
 ├─ docs/
 │  └─ images/
 │     └─ joensuu_scenario.png
+├─ protos/
+│  └─ sapient_msg/
+│     ├─ bsi_flex_335_v2_0/
+│     └─ proto_options.proto
 ├─ src/
 │  ├─ sapient_msg/
 │  │  ├─ bsi_flex_335_v2_0/
-│  │  │  ├─ associated_detection_pb2.py
-│  │  │  ├─ associated_file_pb2.py
-│  │  │  ├─ detection_report_pb2.py
-│  │  │  ├─ location_pb2.py
-│  │  │  ├─ range_bearing_pb2.py
-│  │  │  └─ velocity_pb2.py
 │  │  └─ proto_options_pb2.py
 │  ├─ scenario_foundry/
 │  │  ├─ generation/
@@ -115,8 +115,7 @@ scenario-foundry/
 ├─ tests/
 ├─ LICENSE
 ├─ pyproject.toml
-├─ README.md
-└─ requirements.txt
+└─ README.md
 ```
 
 ## Execution Pipeline (Step-by-Step)
@@ -128,7 +127,7 @@ The synthetic data generation workflow consists of two simple steps and optional
 
 ### Step 1: Scenario Configuration Setup
 
-Create or modify a manually planned attack scenario (e.g., `data/config/scenarios/joensuu.json`).
+Create or modify a manually planned attack scenario (e.g., `config/scenarios/joensuu.json` or `config/scenarios/alakurtti.json`).
 
 Inside the file, define:
 - targets
@@ -136,7 +135,9 @@ Inside the file, define:
 - sensor positions
 - terrain anchor elevations 
 
-You can find detailed instructions form `data/config/scenarios/scenario_guide.md`
+Each threat profile carries a `classification`: an ordered path through the BSI Flex 335 SAPIENT core taxonomy, such as `["Air vehicle", "UAV fixed wing", "Military"]`. The permitted level names live in `config/schemas/taxonomies/sapient_core_v2_0.json`, and shorter paths like `["Air vehicle"]` are valid where the class is only partially resolved.
+
+You can find detailed instructions in `config/scenarios/scenario_guide.md`
 
 ### Step 2: Execute the Generation Engine
 
@@ -148,7 +149,18 @@ python -m src.scenario_foundry.generate_scenario --scenario joensuu
 
 Outputs Generated:
 
+`joensuu_tactical.json`: The scenario refined against terrain elevation, holding the flight vectors the simulation actually flies.
+
 `joensuu_messages.json`: A chronological database of simulated sensor detection reports formatted in compliance with SAPIENT message standards.
+
+#### Validation
+
+Before anything is generated, the generator validates the scenario against `config/schemas/scenario.schema.json` and the SAPIENT taxonomy. An invalid scenario stops the run with a message naming the offending profile and a non-zero exit status, so nothing downstream ever sees a malformed configuration.
+
+To check a scenario on its own, without generating anything:
+```bash
+python -m src.scenario_foundry.validation.validate --location joensuu
+```
 
 #### Reproducibility
 
@@ -164,12 +176,14 @@ The flag is accepted by `generate_scenario`, `generate_sensor_data`, and `optimi
 
 Transform tactical data and sensor message outputs into map-ready CSV files:
 ```bash
-python ./src/export_scenario.py
-  --scenario data/tactical_scenarios/joensuu_tactical.json
-  --messages data/generated_output/joensuu_messages.json
-  --outdir data/export_output/
+python -m src.scenario_foundry.export_scenario \
+  --scenario joensuu_tactical.json \
+  --messages joensuu_messages.json \
+  --outdir data/export_output/ \
   --sample-rate 10
 ```
+`--scenario` and `--messages` are looked up inside `data/tactical_scenarios/` and `data/generated_output/` respectively, unless you pass an absolute path.
+
 OR
 ```bash
 python -m src.scenario_foundry.export_scenario --location joensuu
