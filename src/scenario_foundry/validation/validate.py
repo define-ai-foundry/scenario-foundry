@@ -21,7 +21,7 @@ import pathlib
 from jsonschema import ValidationError, validate
 from shapely import wkt
 
-from scenario_foundry import config
+from scenario_foundry import config, constants
 
 
 class ScenarioValidationError(Exception):
@@ -147,12 +147,19 @@ def validate_threat_profiles(threats, valid_classification_paths):
 def validate_sensor_network(sensors):
 
     ids = set()
+    known_types = [t.value for t in constants.SensorType]
 
     for sensor in sensors:
         if sensor["id"] in ids:
             raise ScenarioValidationError(f"Duplicate sensor id: {sensor['id']}")
 
         ids.add(sensor["id"])
+
+        if sensor["type"] not in known_types:
+            raise ScenarioValidationError(
+                f"{sensor['id']}: unknown sensor type {sensor['type']!r}; "
+                f"expected one of {', '.join(known_types)}"
+            )
 
         validate_coordinates(sensor["lat"], sensor["lon"], f"sensor {sensor['id']}")
 

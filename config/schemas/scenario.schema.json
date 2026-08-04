@@ -125,7 +125,16 @@
             "type": "string"
           },
           "type": {
-            "type": "string"
+            "type": "string",
+            "description": "Sensor type the generator implements; must match scenario_foundry.constants.SensorType",
+            "enum": [
+              "RADAR_STRATEGIC",
+              "RADAR_TACTICAL",
+              "MICRO_DOPPLER",
+              "ACOUSTIC",
+              "THERMAL_CAM",
+              "VISUAL_CAM"
+            ]
           },
           "lat": {
             "type": "number"

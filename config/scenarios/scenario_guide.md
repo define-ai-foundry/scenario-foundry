@@ -86,7 +86,7 @@ Positions and calibrates the physical constraints of defensive sensors.
 
 - `id` (String): Unique hardware tag identifier of the sensor node.
 
-- `type` (String): Sensor classification type (e.g., "RADAR_STRATEGIC", "RADAR_TACTICAL", "ACOUSTIC", "THERMAL_CAM", "VISUAL_CAM").
+- `type` (String): Sensor classification type. The generator implements exactly these, and validation rejects anything else: "RADAR_STRATEGIC", "RADAR_TACTICAL", "MICRO_DOPPLER", "ACOUSTIC", "THERMAL_CAM", "VISUAL_CAM".
 
 - `lat` (Float): Geodetic latitude coordinate of the static sensor node location.
 

@@ -252,6 +252,20 @@ class Sensor:
 
 
 # --- DETECTION REPORT ASSEMBLY ---
+# Sensor types DetectionReportBuilder.build has a payload branch for. A SensorType
+# member absent here has no branch at all, so its reports would carry no position.
+PAYLOAD_SENSOR_TYPES = frozenset(
+    {
+        constants.SensorType.RADAR_STRATEGIC.value,
+        constants.SensorType.RADAR_TACTICAL.value,
+        constants.SensorType.MICRO_DOPPLER.value,
+        constants.SensorType.ACOUSTIC.value,
+        constants.SensorType.THERMAL_CAM.value,
+        constants.SensorType.VISUAL_CAM.value,
+    }
+)
+
+
 class DetectionReportBuilder:
     """Builds the sensor-type-specific BSI Flex 335 payload for one detection."""
 
@@ -289,7 +303,11 @@ class DetectionReportBuilder:
         self.current_sim_time = current_sim_time
 
     def build(self):
-        """Return (report, extra_attributes): the DetectionReport proto plus non-ICD attributes."""
+        """Return (report, extra_attributes): the DetectionReport proto plus non-ICD attributes.
+
+        Returns None when no payload branch applies to this detection, e.g. an optical
+        sensor whose target is inside sensor range but beyond its camera threshold.
+        """
         sensor, wave, thresholds = self.sensor, self.wave, self.thresholds
 
         # 1. Core report: strict ICD fields set directly on the proto.
@@ -385,6 +403,14 @@ class DetectionReportBuilder:
                     "illuminationStatus": constants.ILLUMINATION_POOR_BLIND,
                 }
 
+        # 3. Without a position the report is unusable downstream, so never emit one.
+        if not (report.HasField("location") or report.HasField("range_bearing")):
+            if sensor.type not in PAYLOAD_SENSOR_TYPES:
+                raise ValueError(
+                    f"{sensor.id}: no detection payload branch for sensor type {sensor.type!r}"
+                )
+            return None
+
         return report, extra_attributes
 
 
@@ -478,7 +504,11 @@ def generate_detection_for_sensor(
         calculated_conf=calculated_conf,
         current_sim_time=current_sim_time,
     )
-    report, extra_attributes = report_builder.build()
+    built = report_builder.build()
+    if built is None:
+        return None
+
+    report, extra_attributes = built
     return serialize_and_wrap(report, extra_attributes, sensor, ts_str, step)
 
 
