@@ -35,7 +35,8 @@
       "classification": "UAV_Decoy",
       "launch_delay_sec": 0,
       "id_suffix": "DECOY",
-      "wkt_linestring": "LINESTRING (30.6320 62.1850, 30.1200 62.4520, 29.778501 62.600511)"
+      "wkt_linestring": "LINESTRING (30.6320 62.1850, 30.1200 62.4520, 29.778501 62.600511)",
+      "terminal_dive": false
     },
     "W2_KMS_PLANT": {
       "count": 10,
@@ -80,7 +81,8 @@
       "classification": "UAV_Rotary_Micro_FPV",
       "launch_delay_sec": 600,
       "id_suffix": "FPV",
-      "wkt_linestring": "LINESTRING (29.8820 62.6510, 29.8360 62.5930, 29.832561 62.594810)"
+      "wkt_linestring": "LINESTRING (29.8820 62.6510, 29.8360 62.5930, 29.832561 62.594810)",
+      "rotor_speed_rps": 220.0
     }
   },
   "sensor_network": [

@@ -89,6 +89,13 @@
           "wkt_linestring": {
             "type": "string",
             "pattern": "^LINESTRING\\s*\\("
+          },
+          "terminal_dive": {
+            "type": "boolean"
+          },
+          "rotor_speed_rps": {
+            "type": "number",
+            "minimum": 0
           }
         }
       }

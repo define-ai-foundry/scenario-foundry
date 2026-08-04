@@ -197,6 +197,8 @@ class ThreatWave:
     classification: str
     launch_delay_sec: float
     waypoints: list
+    terminal_dive: bool
+    rotor_speed_rps: float
 
     @classmethod
     def from_config(cls, wave_id, cfg):
@@ -210,6 +212,8 @@ class ThreatWave:
             classification=cfg["classification"],
             launch_delay_sec=cfg["launch_delay_sec"],
             waypoints=parse_wkt(cfg["wkt_linestring"]),
+            terminal_dive=cfg.get("terminal_dive", True),
+            rotor_speed_rps=cfg.get("rotor_speed_rps", constants.ROTOR_SPEED_DEFAULT_RPS),
         )
 
     @property
@@ -328,9 +332,7 @@ class DetectionReportBuilder:
 
             if sensor.type == constants.SensorType.MICRO_DOPPLER:
                 extra_attributes["measuredAttributes"] = {
-                    "microDopplerRotorSpeedRps": constants.ROTOR_SPEED_FPV_RPS
-                    if constants.CLASSIFICATION_FPV_MARKER in wave.classification
-                    else constants.ROTOR_SPEED_DEFAULT_RPS
+                    "microDopplerRotorSpeedRps": wave.rotor_speed_rps
                 }
                 if self.is_diving:
                     extra_attributes["measuredAttributes"]["maneuverState"] = (
@@ -440,8 +442,9 @@ def generate_detection_for_sensor(
         return None
 
     ground_height_msl = get_terrain_elevation(lat, lon, scenario)
+    is_diving = is_final_leg and wave.terminal_dive
     current_agl = wave.alt_m
-    if is_final_leg and wave.classification != constants.CLASSIFICATION_DECOY:
+    if is_diving:
         current_agl = wave.alt_m * (1.0 - ratio)
 
     absolute_altitude_msl = ground_height_msl + current_agl
@@ -458,8 +461,6 @@ def generate_detection_for_sensor(
         solar_elevation = calculate_solar_elevation(sensor.lat, sensor.lon, current_sim_time)
         if solar_elevation <= thresholds["civil_twilight_elevation_deg"]:
             calculated_conf = 0.12
-
-    is_diving = is_final_leg and wave.classification != constants.CLASSIFICATION_DECOY
 
     report_builder = DetectionReportBuilder(
         sensor,
