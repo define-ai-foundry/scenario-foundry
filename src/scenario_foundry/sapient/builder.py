@@ -79,11 +79,16 @@ def make_range_bearing(azimuth, distance, elevation=0.0):
     )
 
 
-def add_classification(report, class_type, confidence):
-    """Append one classification entry to a DetectionReport."""
+def add_classification(report, class_path, confidence):
+    """Append one classification entry, nesting `class_path[1:]` as SubClass levels."""
     entry = report.classification.add()
-    entry.type = class_type
+    entry.type = class_path[0]
     entry.confidence = confidence
+    node = entry
+    for level, class_type in enumerate(class_path[1:], start=1):
+        node = node.sub_class.add()
+        node.type = class_type
+        node.level = level
     return entry
 
 

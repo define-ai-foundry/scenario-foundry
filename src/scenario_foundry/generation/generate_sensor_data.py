@@ -194,7 +194,7 @@ class ThreatWave:
     count: int
     speed_kmh: float
     alt_m: float
-    classification: str
+    classification: list[str]
     launch_delay_sec: float
     waypoints: list
     terminal_dive: bool
@@ -294,7 +294,7 @@ class DetectionReportBuilder:
 
         # 1. Core report: strict ICD fields set directly on the proto.
         report = builder.DetectionReport(state=constants.DETECTION_STATE_ACTIVE)
-        add_classification(report, wave.classification.upper(), self.calculated_conf)
+        add_classification(report, wave.classification, self.calculated_conf)
 
         pfx = wave.prefix
         s_code = sensor.code

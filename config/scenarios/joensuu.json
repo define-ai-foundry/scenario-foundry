@@ -32,7 +32,7 @@
       "count": 12,
       "speed_kmh": 200,
       "alt_m": 1500.0,
-      "classification": "UAV_Decoy",
+      "classification": ["Air vehicle", "UAV rotary wing", "Military"],
       "launch_delay_sec": 0,
       "id_suffix": "DECOY",
       "wkt_linestring": "LINESTRING (30.6320 62.1850, 30.1200 62.4520, 29.778501 62.600511)",
@@ -42,7 +42,7 @@
       "count": 10,
       "speed_kmh": 185,
       "alt_m": 60.0,
-      "classification": "UAV_Propeller_Kamikaze",
+      "classification": ["Air vehicle", "UAV fixed wing", "Military"],
       "launch_delay_sec": 60,
       "id_suffix": "PLANT",
       "wkt_linestring": "LINESTRING (30.6900 62.1510, 30.2000 62.3000, 30.0100 62.5000, 29.832561 62.594810)"
@@ -51,7 +51,7 @@
       "count": 10,
       "speed_kmh": 185,
       "alt_m": 60.0,
-      "classification": "UAV_Propeller_Kamikaze",
+      "classification": ["Air vehicle", "UAV fixed wing", "Military"],
       "launch_delay_sec": 90,
       "id_suffix": "RAILWAY",
       "wkt_linestring": "LINESTRING (31.1200 62.4200, 30.5000 62.5500, 29.9000 62.6200, 29.778501 62.600511)"
@@ -60,7 +60,7 @@
       "count": 10,
       "speed_kmh": 185,
       "alt_m": 60.0,
-      "classification": "UAV_Propeller_Kamikaze",
+      "classification": ["Air vehicle", "UAV fixed wing", "Military"],
       "launch_delay_sec": 120,
       "id_suffix": "BRIDGE",
       "wkt_linestring": "LINESTRING (30.6320 62.1850, 29.9500 62.4500, 29.790993 62.608862)"
@@ -69,7 +69,7 @@
       "count": 10,
       "speed_kmh": 185,
       "alt_m": 60.0,
-      "classification": "UAV_Propeller_Kamikaze",
+      "classification": ["Air vehicle", "UAV fixed wing", "Military"],
       "launch_delay_sec": 150,
       "id_suffix": "AIRPORT",
       "wkt_linestring": "LINESTRING (31.3100 62.6710, 30.4000 62.7500, 29.8500 62.7200, 29.614660 62.657369)"
@@ -78,7 +78,7 @@
       "count": 6,
       "speed_kmh": 100,
       "alt_m": 15.0,
-      "classification": "UAV_Rotary_Micro_FPV",
+      "classification": ["Air vehicle", "UAV rotary wing", "Military"],
       "launch_delay_sec": 600,
       "id_suffix": "FPV",
       "wkt_linestring": "LINESTRING (29.8820 62.6510, 29.8360 62.5930, 29.832561 62.594810)",

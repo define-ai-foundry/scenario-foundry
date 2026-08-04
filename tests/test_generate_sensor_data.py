@@ -193,7 +193,7 @@ def _wave(
         "count": count,
         "speed_kmh": speed,
         "alt_m": alt,
-        "classification": cls,
+        "classification": cls if isinstance(cls, list) else [cls],
         "launch_delay_sec": delay,
         "id_suffix": suffix,
         "wkt_linestring": f"LINESTRING ({lo1} {la1}, {lo2} {la2})",
@@ -222,7 +222,7 @@ def _full_scenario(start_time):
                 (62.49, 29.49),
                 speed=20,
                 alt=2000,
-                cls="UAV_Kamikaze",
+                cls=["Air vehicle", "UAV fixed wing", "Military"],
                 suffix="DIVE",
             ),
             # Low-alt -> strategic radar altitude<100 -> continue.
@@ -419,6 +419,14 @@ def test_main_night_run(tmp_path, monkeypatch):
     ]
     assert any(_object_info_dict(r).get("tacticalState") == "TERMINAL_DIVE" for r in swarm)
 
+    # SW_dive's three-level path is emitted as nested subClass levels
+    top = swarm[0]["classification"][0]
+    assert top["type"] == "Air vehicle"
+    level1 = top["subClass"][0]
+    assert (level1["type"], level1["level"]) == ("UAV fixed wing", 1)
+    level2 = level1["subClass"][0]
+    assert (level2["type"], level2["level"]) == ("Military", 2)
+
     # micro-doppler rotor branches (both FPV=220 and plain=75)
     rotor_speeds = {
         _object_info_dict(r)["microDopplerRotorSpeedRps"]
@@ -544,7 +552,7 @@ def test_threat_wave_from_config():
         "count": 8,
         "speed_kmh": 20,
         "alt_m": 2000,
-        "classification": "UAV_Kamikaze",
+        "classification": ["Air vehicle", "UAV rotary wing", "Military"],
         "launch_delay_sec": 0,
         "wkt_linestring": "LINESTRING (29.50 62.50, 29.49 62.49)",
     }
@@ -554,7 +562,7 @@ def test_threat_wave_from_config():
     assert wave.count == 8
     assert wave.speed_kmh == 20
     assert wave.alt_m == 2000
-    assert wave.classification == "UAV_Kamikaze"
+    assert wave.classification == ["Air vehicle", "UAV rotary wing", "Military"]
     assert wave.launch_delay_sec == 0
     assert wave.waypoints == [{"lat": 62.50, "lon": 29.50}, {"lat": 62.49, "lon": 29.49}]
     assert wave.terminal_dive is True
@@ -567,7 +575,7 @@ def test_threat_wave_from_config_behaviour_overrides():
         "count": 8,
         "speed_kmh": 20,
         "alt_m": 2000,
-        "classification": "UAV_Decoy",
+        "classification": ["UAV_Decoy"],
         "launch_delay_sec": 0,
         "wkt_linestring": "LINESTRING (29.50 62.50, 29.49 62.49)",
         "terminal_dive": False,
@@ -584,7 +592,7 @@ def test_threat_wave_prefix():
         "count": 8,
         "speed_kmh": 20,
         "alt_m": 2000,
-        "classification": "UAV_Kamikaze",
+        "classification": ["UAV_Kamikaze"],
         "launch_delay_sec": 0,
         "wkt_linestring": "LINESTRING (29.50 62.50, 29.49 62.49)",
     }
@@ -628,7 +636,7 @@ def test_prepare_threat_waves_order_and_parsing():
                 "count": 8,
                 "speed_kmh": 20,
                 "alt_m": 2000,
-                "classification": "UAV_Kamikaze",
+                "classification": ["UAV_Kamikaze"],
                 "launch_delay_sec": 0,
                 "wkt_linestring": "LINESTRING (29.50 62.50, 29.49 62.49)",
             },
@@ -637,7 +645,7 @@ def test_prepare_threat_waves_order_and_parsing():
                 "count": 6,
                 "speed_kmh": 20,
                 "alt_m": 100,
-                "classification": "UAV_Rotary_FPV",
+                "classification": ["UAV_Rotary_FPV"],
                 "launch_delay_sec": 0,
                 "wkt_linestring": "LINESTRING (29.70 62.50, 29.69 62.49)",
             },
@@ -676,7 +684,7 @@ def _wave_obj(
 def test_detection_report_builder_swarm_branch():
     thresholds = constants.resolve_detection_thresholds({})
     sensor = g.Sensor(id="RAD-STRAT-1", type="RADAR_STRATEGIC", lat=62.6, lon=29.5, range_m=150000)
-    wave = _wave_obj("SW_dive", "DIVE", count=8, classification="UAV_Kamikaze")
+    wave = _wave_obj("SW_dive", "DIVE", count=8, classification=["UAV_Kamikaze"])
     builder = g.DetectionReportBuilder(
         sensor,
         wave,
@@ -703,7 +711,9 @@ def test_detection_report_builder_swarm_branch():
 def test_detection_report_builder_micro_doppler_diving_branch():
     thresholds = constants.resolve_detection_thresholds({})
     sensor = g.Sensor(id="MDOP-A", type="MICRO_DOPPLER", lat=62.505, lon=29.70, range_m=3500)
-    wave = _wave_obj("FP_v", "FPV", count=6, classification="UAV_Rotary_FPV", rotor_speed_rps=220.0)
+    wave = _wave_obj(
+        "FP_v", "FPV", count=6, classification=["UAV_Rotary_FPV"], rotor_speed_rps=220.0
+    )
     builder = g.DetectionReportBuilder(
         sensor,
         wave,
@@ -730,7 +740,7 @@ def test_detection_report_builder_micro_doppler_diving_branch():
 def test_detection_report_builder_acoustic_branch():
     thresholds = constants.resolve_detection_thresholds({})
     sensor = g.Sensor(id="ACU-X", type="ACOUSTIC", lat=62.50, lon=29.70, range_m=3000)
-    wave = _wave_obj("SW_dive", "DIVE", count=8, classification="UAV_Kamikaze")
+    wave = _wave_obj("SW_dive", "DIVE", count=8, classification=["UAV_Kamikaze"])
     builder = g.DetectionReportBuilder(
         sensor,
         wave,
@@ -762,7 +772,7 @@ def _final_leg_detection(monkeypatch, *, terminal_dive):
         count=8,
         speed_kmh=360,
         alt_m=1000,
-        classification="UAV_Kamikaze",
+        classification=["UAV_Kamikaze"],
         launch_delay_sec=0,
         waypoints=g.parse_wkt("LINESTRING (29.70 62.50, 29.69 62.49)"),
         terminal_dive=terminal_dive,

@@ -38,6 +38,36 @@ def test_decimate_long_keeps_first_and_last():
     assert "20.0 20.0" in kept
 
 
+# --- classification_path_and_confidence ---
+def test_classification_path_no_entries():
+    assert es.classification_path_and_confidence([]) == ("UNKNOWN", 0.0)
+
+
+def test_classification_path_single_level():
+    path, confidence = es.classification_path_and_confidence([{"type": "UAV_X", "confidence": 0.9}])
+    assert path == "UAV_X"
+    assert confidence == 0.9
+
+
+def test_classification_path_nested_sub_class():
+    class_list = [
+        {
+            "type": "Air vehicle",
+            "confidence": 0.75,
+            "subClass": [
+                {
+                    "type": "UAV rotary wing",
+                    "level": 1,
+                    "subClass": [{"type": "Military", "level": 2}],
+                }
+            ],
+        }
+    ]
+    path, confidence = es.classification_path_and_confidence(class_list)
+    assert path == "Air vehicle > UAV rotary wing > Military"
+    assert confidence == 0.75  # only the top-level entry carries confidence
+
+
 # --- layer exporters ---
 def _tactical():
     return {
@@ -47,13 +77,19 @@ def _tactical():
         },
         "threat_profiles": {
             "W1": {
-                "classification": "UAV_X",
+                "classification": ["Air vehicle", "UAV rotary wing", "Military"],
                 "target": "T1",
                 "speed_kmh": 100,
                 "alt_m": 50.0,
                 "wkt_linestring": "LINESTRING (29.0 62.0, 29.1 62.1)",
             },
             "W2": {"wkt_linestring": ""},
+            "W3": {
+                "target": "T2",
+                "speed_kmh": 50,
+                "alt_m": 10.0,
+                "wkt_linestring": "LINESTRING (29.2 62.2, 29.3 62.3)",
+            },
         },
         "sensor_network": [
             {
@@ -87,8 +123,11 @@ def test_export_flight_vectors_skips_empty_wkt(tmp_path):
         "Planned_Altitude_M",
         "WKT",
     ]
-    assert len(rows) == 2  # header + W1 only (W2 empty wkt skipped)
+    assert len(rows) == 3  # header + W1, W3 (W2 empty wkt skipped)
     assert rows[1][0] == "W1"
+    assert rows[1][1] == "Air vehicle > UAV rotary wing > Military"
+    assert rows[2][0] == "W3"
+    assert rows[2][1] == "UNKNOWN"  # no classification key -> default
 
 
 def test_export_sensor_network(tmp_path):
@@ -113,6 +152,30 @@ def test_export_sensor_detections_full_and_defaults(tmp_path):
                 },
             }
         },
+        {
+            "sapientMessage": {
+                "timestamp": "2026-01-01T00:00:05Z",
+                "nodeId": "S1",
+                "detectionReport": {
+                    "objectId": "O2",
+                    "state": "ACTIVE",
+                    "classification": [
+                        {
+                            "type": "Air vehicle",
+                            "confidence": 0.75,
+                            "subClass": [
+                                {
+                                    "type": "UAV rotary wing",
+                                    "level": 1,
+                                    "subClass": [{"type": "Military", "level": 2}],
+                                }
+                            ],
+                        }
+                    ],
+                    "location": {"x": 29.1, "y": 62.1, "z": 100.0},
+                },
+            }
+        },
         {"sapientMessage": {"detectionReport": {}}},
     ]
     es.export_sensor_detections(messages, str(tmp_path))
@@ -122,10 +185,12 @@ def test_export_sensor_detections_full_and_defaults(tmp_path):
     assert rows[0]["Confidence"] == "0.9"
     assert rows[0]["Swarm_Count"] == "7"
     assert rows[0]["Elevation_M"] == "120.0"
-    assert rows[1]["Drone_Type"] == "UNKNOWN"
-    assert rows[1]["Confidence"] == "0.0"
-    assert rows[1]["Swarm_Count"] == "1"
-    assert rows[1]["Latitude"] == ""
+    assert rows[1]["Drone_Type"] == "Air vehicle > UAV rotary wing > Military"
+    assert rows[1]["Confidence"] == "0.75"
+    assert rows[2]["Drone_Type"] == "UNKNOWN"
+    assert rows[2]["Confidence"] == "0.0"
+    assert rows[2]["Swarm_Count"] == "1"
+    assert rows[2]["Latitude"] == ""
 
 
 # --- resolve_input ---
