@@ -52,18 +52,13 @@ class SensorType(str, Enum):
         return "RADAR" in sensor_type
 
 
-# --- Threat classification tokens ---
-CLASSIFICATION_DECOY = "UAV_Decoy"
-# Substring flagging first-person-view rotary threats.
-CLASSIFICATION_FPV_MARKER = "FPV"
-
 # --- Terrain elevation ---
 DEFAULT_TERRAIN_ELEVATION_M = 80.0
 # Raster values at or below this are treated as no-data.
 ELEVATION_NODATA_THRESHOLD_M = -500.0
 
-# --- Micro-doppler rotor speeds (rev/s) ---
-ROTOR_SPEED_FPV_RPS = 220.0
+# --- Micro-doppler rotor speed (rev/s) ---
+# Reported for any threat whose profile omits rotor_speed_rps.
 ROTOR_SPEED_DEFAULT_RPS = 75.0
 
 # --- Default detection thresholds ---

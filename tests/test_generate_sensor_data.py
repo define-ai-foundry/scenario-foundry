@@ -175,9 +175,21 @@ def test_calculate_dynamic_confidence_branches(sensor_type):
 
 
 # --- main() end-to-end ---
-def _wave(start, end, *, speed, alt, cls, suffix, count=8, delay=0):
+def _wave(
+    start,
+    end,
+    *,
+    speed,
+    alt,
+    cls,
+    suffix,
+    count=8,
+    delay=0,
+    terminal_dive=None,
+    rotor_speed_rps=None,
+):
     (la1, lo1), (la2, lo2) = start, end
-    return {
+    cfg = {
         "count": count,
         "speed_kmh": speed,
         "alt_m": alt,
@@ -186,6 +198,11 @@ def _wave(start, end, *, speed, alt, cls, suffix, count=8, delay=0):
         "id_suffix": suffix,
         "wkt_linestring": f"LINESTRING ({lo1} {la1}, {lo2} {la2})",
     }
+    if terminal_dive is not None:
+        cfg["terminal_dive"] = terminal_dive
+    if rotor_speed_rps is not None:
+        cfg["rotor_speed_rps"] = rotor_speed_rps
+    return cfg
 
 
 def _full_scenario(start_time):
@@ -212,7 +229,7 @@ def _full_scenario(start_time):
             "LO_alt": _wave(
                 (62.50, 29.50), (62.49, 29.49), speed=20, alt=5, cls="UAV_Low", suffix="LOW"
             ),
-            # Decoy with launch delay -> launch-delay + non-diving-decoy branches.
+            # Decoy with launch delay -> launch-delay + terminal_dive=False branches.
             "DE_coy": _wave(
                 (62.50, 29.50),
                 (62.49, 29.49),
@@ -221,12 +238,13 @@ def _full_scenario(start_time):
                 cls="UAV_Decoy",
                 suffix="DECOY",
                 delay=30,
+                terminal_dive=False,
             ),
             # Close to tactical radar -> IND + velocity.
             "TA_ctic": _wave(
                 (62.50, 29.70), (62.49, 29.69), speed=20, alt=500, cls="UAV_Kamikaze", suffix="TAC"
             ),
-            # FPV -> micro-doppler rotor 220 branch.
+            # FPV -> micro-doppler rotor 220 branch (explicit rotor_speed_rps).
             "FP_v": _wave(
                 (62.50, 29.70),
                 (62.49, 29.69),
@@ -235,8 +253,9 @@ def _full_scenario(start_time):
                 cls="UAV_Rotary_FPV",
                 suffix="FPV",
                 count=6,
+                rotor_speed_rps=220.0,
             ),
-            # Non-FPV -> micro-doppler rotor 75 branch.
+            # Non-FPV, no override -> default micro-doppler rotor 75 branch.
             "MP_lain": _wave(
                 (62.50, 29.70), (62.49, 29.69), speed=20, alt=100, cls="UAV_Prop", suffix="PLAIN"
             ),
@@ -538,6 +557,25 @@ def test_threat_wave_from_config():
     assert wave.classification == "UAV_Kamikaze"
     assert wave.launch_delay_sec == 0
     assert wave.waypoints == [{"lat": 62.50, "lon": 29.50}, {"lat": 62.49, "lon": 29.49}]
+    assert wave.terminal_dive is True
+    assert wave.rotor_speed_rps == constants.ROTOR_SPEED_DEFAULT_RPS
+
+
+def test_threat_wave_from_config_behaviour_overrides():
+    cfg = {
+        "id_suffix": "DECOY",
+        "count": 8,
+        "speed_kmh": 20,
+        "alt_m": 2000,
+        "classification": "UAV_Decoy",
+        "launch_delay_sec": 0,
+        "wkt_linestring": "LINESTRING (29.50 62.50, 29.49 62.49)",
+        "terminal_dive": False,
+        "rotor_speed_rps": 220.0,
+    }
+    wave = g.ThreatWave.from_config("DE_coy", cfg)
+    assert wave.terminal_dive is False
+    assert wave.rotor_speed_rps == 220.0
 
 
 def test_threat_wave_prefix():
@@ -613,7 +651,14 @@ def test_prepare_threat_waves_order_and_parsing():
 
 
 # --- DetectionReportBuilder.build() ---
-def _wave_obj(wave_id, id_suffix, count, classification):
+def _wave_obj(
+    wave_id,
+    id_suffix,
+    count,
+    classification,
+    terminal_dive=True,
+    rotor_speed_rps=constants.ROTOR_SPEED_DEFAULT_RPS,
+):
     return g.ThreatWave(
         wave_id=wave_id,
         id_suffix=id_suffix,
@@ -623,6 +668,8 @@ def _wave_obj(wave_id, id_suffix, count, classification):
         classification=classification,
         launch_delay_sec=0,
         waypoints=[],
+        terminal_dive=terminal_dive,
+        rotor_speed_rps=rotor_speed_rps,
     )
 
 
@@ -653,10 +700,10 @@ def test_detection_report_builder_swarm_branch():
     assert extra["measuredAttributes"]["tacticalState"] == "TERMINAL_DIVE"
 
 
-def test_detection_report_builder_micro_doppler_fpv_diving_branch():
+def test_detection_report_builder_micro_doppler_diving_branch():
     thresholds = constants.resolve_detection_thresholds({})
     sensor = g.Sensor(id="MDOP-A", type="MICRO_DOPPLER", lat=62.505, lon=29.70, range_m=3500)
-    wave = _wave_obj("FP_v", "FPV", count=6, classification="UAV_Rotary_FPV")
+    wave = _wave_obj("FP_v", "FPV", count=6, classification="UAV_Rotary_FPV", rotor_speed_rps=220.0)
     builder = g.DetectionReportBuilder(
         sensor,
         wave,
@@ -703,3 +750,47 @@ def test_detection_report_builder_acoustic_branch():
     report, _extra = builder.build()
     assert report.object_id.startswith("ACU-")
     assert report.HasField("range_bearing")
+
+
+# --- generate_detection_for_sensor() terminal descent ---
+def _final_leg_detection(monkeypatch, *, terminal_dive):
+    """One micro-doppler detection halfway along a single-leg route, at ground level 0 m."""
+    monkeypatch.setattr(g, "read_elevation_from_local_asc", lambda *a, **k: 0.0)
+    wave = g.ThreatWave(
+        wave_id="SW_dive",
+        id_suffix="DIVE",
+        count=8,
+        speed_kmh=360,
+        alt_m=1000,
+        classification="UAV_Kamikaze",
+        launch_delay_sec=0,
+        waypoints=g.parse_wkt("LINESTRING (29.70 62.50, 29.69 62.49)"),
+        terminal_dive=terminal_dive,
+        rotor_speed_rps=constants.ROTOR_SPEED_DEFAULT_RPS,
+    )
+    sensor = g.Sensor(id="MDOP-A", type="MICRO_DOPPLER", lat=62.495, lon=29.695, range_m=3500)
+    entry = g.generate_detection_for_sensor(
+        sensor,
+        wave,
+        6.0,
+        datetime(2026, 1, 1),
+        "2026-01-01T00:00:00Z",
+        {},
+        constants.resolve_detection_thresholds({}),
+        0,
+    )
+    return entry["sapientMessage"]["detectionReport"]
+
+
+def test_terminal_dive_descends_on_final_leg(monkeypatch):
+    report = _final_leg_detection(monkeypatch, terminal_dive=True)
+    assert report["location"]["z"] < 1000.0
+    assert report["enuVelocity"]["upRate"] == -15.0
+    assert _object_info_dict(report)["maneuverState"] == "HIGH_G_DIVE"
+
+
+def test_terminal_dive_disabled_holds_altitude(monkeypatch):
+    report = _final_leg_detection(monkeypatch, terminal_dive=False)
+    assert report["location"]["z"] == 1000.0
+    assert report["enuVelocity"]["upRate"] == 0.0
+    assert "maneuverState" not in _object_info_dict(report)
