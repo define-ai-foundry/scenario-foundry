@@ -55,8 +55,8 @@ def fetch_tile_from_opentopography(lat_min, lon_min, tile_name, cache_dir, api_k
     print(f"  [API GATEWAY] Fetching plaintext AAIGrid dataset for tile: {tile_name}")
     try:
         ssl_context = ssl.create_default_context()
-        req = urllib.request.Request(url, headers={"User-Agent": "SAPIENT-Generation-Engine"})  # noqa: S310
-        with urllib.request.urlopen(req, timeout=65, context=ssl_context) as response:  # noqa: S310
+        req = urllib.request.Request(url, headers={"User-Agent": "SAPIENT-Generation-Engine"})
+        with urllib.request.urlopen(req, timeout=65, context=ssl_context) as response:
             raw_data = response.read()
             if b"Error" in raw_data[:100] or len(raw_data) < 2000:
                 return False

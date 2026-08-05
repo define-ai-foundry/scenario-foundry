@@ -27,7 +27,7 @@ dependencies = [
 dev = [
     "pytest>=8",
     "pytest-cov>=5",
-    "ruff>=0.6",
+    "ruff==0.16.1",
 ]
 
 # OPTIONAL BUT HIGHLY RECOMMENDED: 
@@ -73,6 +73,10 @@ ignore = [
     "S101",  # asserts are the point of tests
     "S603",  # subprocess calls in CLI tests are trusted
 ]
+# The one URL opened here is the OpenTopography endpoint built in this module.
+# Ignored per-file rather than per-line: which of these calls S310 flags moved
+# in ruff 0.16, so a noqa is unused on one version and required on the other.
+"src/scenario_foundry/generation/fetch_terrain.py" = ["S310"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
